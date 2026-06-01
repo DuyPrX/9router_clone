@@ -12,6 +12,16 @@ import {
   KIRO_AGENTIC_SYSTEM_PROMPT
 } from "../../config/kiroConstants.js";
 
+function formatLocalContextTime(date = new Date()) {
+  const pad = (value) => String(value).padStart(2, "0");
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absOffset = Math.abs(offsetMinutes);
+  const offset = sign + pad(Math.floor(absOffset / 60)) + ":" + pad(absOffset % 60);
+  return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) + " " +
+    pad(date.getHours()) + ":" + pad(date.getMinutes()) + ":" + pad(date.getSeconds()) + " " + offset;
+}
+
 /**
  * Convert OpenAI messages to Kiro format
  * Rules: system/tool/user -> user role, merge consecutive same roles
@@ -353,7 +363,7 @@ export function buildKiroPayload(model, body, stream, credentials) {
   const profileArn = credentials?.providerSpecificData?.profileArn || "";
 
   let finalContent = currentMessage?.userInputMessage?.content || "";
-  const timestamp = new Date().toISOString();
+  const timestamp = formatLocalContextTime();
 
   // Build the system-prompt prefix that goes ABOVE the user message body.
   // Order: thinking_mode tag first (so Kiro sees it before any user text),
