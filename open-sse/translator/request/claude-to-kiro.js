@@ -33,6 +33,7 @@ import {
 } from "../../config/kiroConstants.js";
 import { DEFAULT_IMAGE_MIME } from "../schema/index.js";
 import { ROLE, CLAUDE_BLOCK } from "../schema/index.js";
+import { formatLocalContextTime } from "../concerns/localTime.js";
 
 /** Stringify a tool_use input as a readable line. */
 function toolUseToText(name, input) {
@@ -413,7 +414,7 @@ export function claudeToKiroRequest(model, body, stream, credentials) {
   }
 
   // Prefix order: thinking_mode tag, timestamp marker, then agentic prompt.
-  const timestamp = new Date().toISOString();
+  const timestamp = formatLocalContextTime();
   const prefixParts = [];
   if (thinkingEnabled) prefixParts.push(buildThinkingSystemPrefix());
   prefixParts.push(`[Context: Current time is ${timestamp}]`);

@@ -16,6 +16,7 @@ import {
 import { parseDataUri } from "../concerns/image.js";
 import { DEFAULT_IMAGE_MIME } from "../schema/index.js";
 import { ROLE, OPENAI_BLOCK, CLAUDE_BLOCK } from "../schema/index.js";
+import { formatLocalContextTime } from "../concerns/localTime.js";
 
 /** Render a single tool call as a readable text line. */
 function toolCallToText(name, input) {
@@ -536,8 +537,7 @@ export function openaiToKiroRequest(model, body, stream, credentials) {
     : (credentials?.providerSpecificData?.profileArn || resolveDefaultProfileArn(authMethod));
 
   let finalContent = currentMessage?.userInputMessage?.content || "";
-
-  const timestamp = new Date().toISOString();
+  const timestamp = formatLocalContextTime();
 
   // Build the system-prompt prefix that goes ABOVE the user message body.
   // Order: thinking_mode tag first (so Kiro sees it before any user text),
