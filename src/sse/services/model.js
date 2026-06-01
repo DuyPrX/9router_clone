@@ -64,7 +64,11 @@ export async function getModelInfo(modelStr) {
     return { provider: null, model: parsed.model };
   }
 
-  return getModelInfoCore(modelStr, getModelAliases);
+  const resolved = await getModelInfoCore(modelStr, getModelAliases);
+  if (resolved && (resolved.provider === "combo" || resolved.provider === "Main_Code" || resolved.provider === "Fast" || resolved.provider === "Thinking")) {
+    return { provider: null, model: resolved.model };
+  }
+  return resolved;
 }
 
 /**

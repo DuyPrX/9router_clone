@@ -17,6 +17,41 @@ import {
  * Rules: system/tool/user -> user role, merge consecutive same roles
  */
 function convertMessages(messages, tools, model) {
+  let messagesToConvert = messages;
+  const maxHistoryTurns = 6; // Keep at most 6 complete turns of history to prevent upstream stall/latency
+  if (messages.length > 15) { // Only truncate if history is relatively long
+    let userTurnsCount = 0;
+    let cutIdx = 0;
+    
+    // Scan backwards to find the starting index of a clean user turn
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      // Check if it is a clean user turn start (role is user, and is not a tool result or tool call)
+      const isCleanUser = msg.role === "user" && 
+                          !msg.tool_call_id && 
+                          !msg.tool_calls &&
+                          !(Array.isArray(msg.content) && msg.content.some(c => c.type === "tool_result" || c.type === "tool_use" || c.tool_use_id));
+      
+      if (isCleanUser) {
+        userTurnsCount++;
+        if (userTurnsCount >= maxHistoryTurns) {
+          cutIdx = i;
+          break;
+        }
+      }
+    }
+    
+    if (cutIdx > 0) {
+      const sliced = messages.slice(cutIdx);
+      const hasSystem = messages[0]?.role === "system";
+      if (hasSystem) {
+        messagesToConvert = [messages[0], ...sliced];
+      } else {
+        messagesToConvert = sliced;
+      }
+    }
+  }
+
   let history = [];
   let currentMessage = null;
   
@@ -96,8 +131,8 @@ function convertMessages(messages, tools, model) {
     }
   };
 
-  for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i];
+  for (let i = 0; i < messagesToConvert.length; i++) {
+    const msg = messagesToConvert[i];
     let role = msg.role;
     
     // Normalize: system/tool -> user

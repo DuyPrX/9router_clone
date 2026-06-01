@@ -29,4 +29,10 @@ export class OpenCodeExecutor extends BaseExecutor {
       "Accept": "text/event-stream"
     };
   }
+
+  transformRequest(model, body) {
+    // OpenCode (public) needs injectReasoningContent just like deepseek/opencode-go
+    const { injectReasoningContent } = require("../utils/reasoningContentInjector.js");
+    return injectReasoningContent({ provider: this.provider, model, body });
+  }
 }

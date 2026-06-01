@@ -25,10 +25,16 @@ export function filterToOpenAIFormat(body) {
     // Handle array content
     if (Array.isArray(msg.content)) {
       const filteredContent = [];
+      let reasoningContent = "";
       
       for (const block of msg.content) {
         // Skip thinking blocks
-        if (block.type === "thinking" || block.type === "redacted_thinking") continue;
+        if (block.type === "thinking" || block.type === "redacted_thinking") {
+          if (block.thinking) {
+            reasoningContent += block.thinking;
+          }
+          continue;
+        }
         
         // Only keep valid OpenAI content types
         if (VALID_OPENAI_CONTENT_TYPES.includes(block.type)) {
@@ -50,7 +56,11 @@ export function filterToOpenAIFormat(body) {
         filteredContent.push({ type: "text", text: "" });
       }
       
-      return { ...msg, content: filteredContent };
+      const newMsg = { ...msg, content: filteredContent };
+      if (reasoningContent && msg.role === "assistant") {
+        newMsg.reasoning_content = reasoningContent;
+      }
+      return newMsg;
     }
     
     return msg;

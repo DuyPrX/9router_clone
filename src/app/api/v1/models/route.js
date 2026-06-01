@@ -430,9 +430,31 @@ export async function OPTIONS() {
  * GET /v1/models - OpenAI compatible models list (LLM/chat models only by default).
  * For other capabilities use /v1/models/{kind} (image, tts, stt, embedding, image-to-text, web).
  */
-export async function GET() {
+export async function GET(request) {
   try {
     const data = await buildModelsList([LLM_KIND]);
+
+    // Check if request headers specify Anthropic format
+    const headers = request?.headers;
+    const isAnthropic = headers && (
+      headers.get("anthropic-version") || 
+      headers.get("x-api-key") ||
+      (headers.get("user-agent") && headers.get("user-agent").toLowerCase().includes("anthropic")) ||
+      (headers.get("user-agent") && headers.get("user-agent").toLowerCase().includes("claude-code"))
+    );
+
+    if (isAnthropic) {
+      const anthropicData = data.map(model => ({
+        type: "model",
+        id: model.id,
+        display_name: model.id.includes('/') ? model.id.split('/').pop() : model.id,
+        created_at: new Date().toISOString()
+      }));
+      return Response.json({ data: anthropicData, has_more: false }, {
+        headers: { "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
     return Response.json({ object: "list", data }, {
       headers: { "Access-Control-Allow-Origin": "*" },
     });

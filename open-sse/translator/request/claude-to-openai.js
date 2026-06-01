@@ -123,9 +123,16 @@ function convertClaudeMessage(msg) {
     const parts = [];
     const toolCalls = [];
     const toolResults = [];
+    let reasoningContent = "";
 
     for (const block of msg.content) {
       switch (block.type) {
+        case "thinking":
+          if (block.thinking) {
+            reasoningContent += block.thinking;
+          }
+          break;
+
         case "text":
           parts.push({ type: "text", text: block.text });
           break;
@@ -194,20 +201,31 @@ function convertClaudeMessage(msg) {
           : parts;
       }
       result.tool_calls = toolCalls;
+      if (reasoningContent) {
+        result.reasoning_content = reasoningContent;
+      }
       return result;
     }
 
     // Return content
-    if (parts.length > 0) {
-      return {
+    if (parts.length > 0 || reasoningContent) {
+      const result = {
         role,
-        content: parts.length === 1 && parts[0].type === "text" ? parts[0].text : parts
+        content: parts.length === 1 && parts[0].type === "text" ? parts[0].text : (parts.length > 0 ? parts : "")
       };
+      if (reasoningContent && role === "assistant") {
+        result.reasoning_content = reasoningContent;
+      }
+      return result;
     }
     
     // Empty content array
     if (msg.content.length === 0) {
-      return { role, content: "" };
+      const result = { role, content: "" };
+      if (reasoningContent && role === "assistant") {
+        result.reasoning_content = reasoningContent;
+      }
+      return result;
     }
   }
 
