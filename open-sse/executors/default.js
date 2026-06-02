@@ -6,6 +6,18 @@ import { getCachedClaudeHeaders } from "../utils/claudeHeaderCache.js";
 import { proxyAwareFetch } from "../utils/proxyFetch.js";
 import { injectReasoningContent } from "../utils/reasoningContentInjector.js";
 
+function isXiaomiClaudeModel(model) {
+  return typeof model === "string" && model.endsWith("-claude");
+}
+
+function stripXiaomiClaudeSuffix(model) {
+  return isXiaomiClaudeModel(model) ? model.slice(0, -"-claude".length) : model;
+}
+
+function xiaomiTokenplanAnthropicBaseUrl(credentials) {
+  return resolveXiaomiTokenplanBaseUrl(credentials).replace(/\/v1\/?$/, "/anthropic/v1");
+}
+
 export class DefaultExecutor extends BaseExecutor {
   constructor(provider) {
     super(provider, PROVIDERS[provider] || PROVIDERS.openai);
@@ -13,7 +25,9 @@ export class DefaultExecutor extends BaseExecutor {
 
   transformRequest(model, body) {
     const transformed = this.applyJsonSchemaFallback(body);
-    return injectReasoningContent({ provider: this.provider, model, body: transformed });
+    const upstreamModel = stripXiaomiClaudeSuffix(model);
+    const withModel = upstreamModel !== model ? { ...transformed, model: upstreamModel } : transformed;
+    return injectReasoningContent({ provider: this.provider, model: upstreamModel, body: withModel });
   }
 
   // Fallback json_schema → json_object for openai-compatible providers without native Structured Output.
@@ -61,7 +75,8 @@ export class DefaultExecutor extends BaseExecutor {
         return `${this.config.baseUrl}/${model}:${stream ? "streamGenerateContent?alt=sse" : "generateContent"}`;
       default: {
         if (this.provider === "xiaomi-tokenplan") {
-          return `${resolveXiaomiTokenplanBaseUrl(credentials)}/chat/completions`;
+          const baseUrl = resolveXiaomiTokenplanBaseUrl(credentials);
+          return isXiaomiClaudeModel(model) ? `${xiaomiTokenplanAnthropicBaseUrl(credentials)}/messages` : `${baseUrl}/chat/completions`;
         }
         const url = this.config.baseUrl;
         if (url?.includes("{accountId}")) {
