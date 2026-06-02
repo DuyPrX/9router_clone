@@ -18,6 +18,12 @@ export default {
   transport: {
     baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions",
     validateUrl: "https://integrate.api.nvidia.com/v1/models",
+    fetchConnectTimeoutMs: 10 * 1000,
+    retry: {
+      502: { attempts: 0, delayMs: 0 },
+      503: { attempts: 1, delayMs: 1000 },
+      504: { attempts: 1, delayMs: 1000 },
+    },
   },
   models: [
     { id: "minimaxai/minimax-m2.7", name: "Minimax M2.7" },
