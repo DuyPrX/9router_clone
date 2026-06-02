@@ -174,9 +174,53 @@ function safeJSONParse(str, fallback) {
  *
  * Returns { history, currentMessage }.
  */
+function getMaxHistoryTurns(messages, tools) {
+  const toolCount = Array.isArray(tools) ? tools.length : 0;
+  if (toolCount >= 50 || messages.length >= 120) return 3;
+  if (toolCount >= 25 || messages.length >= 80) return 4;
+  return 6;
+}
+
 function convertMessages(messages, tools, model) {
+  let messagesToConvert = messages;
+  const maxHistoryTurns = getMaxHistoryTurns(messages, tools);
+  if (messages.length > 15) { // Only truncate if history is relatively long
+    let userTurnsCount = 0;
+    let cutIdx = 0;
+    
+    // Scan backwards to find the starting index of a clean user turn
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      // Check if it is a clean user turn start (role is user, and is not a tool result or tool call)
+      const isCleanUser = msg.role === "user" && 
+                          !msg.tool_call_id && 
+                          !msg.tool_calls &&
+                          !(Array.isArray(msg.content) && msg.content.some(c => c.type === "tool_result" || c.type === "tool_use" || c.tool_use_id));
+      
+      if (isCleanUser) {
+        userTurnsCount++;
+        if (userTurnsCount >= maxHistoryTurns) {
+          cutIdx = i;
+          break;
+        }
+      }
+    }
+    
+    if (cutIdx > 0) {
+      const sliced = messages.slice(cutIdx);
+      const hasSystem = messages[0]?.role === "system";
+      if (hasSystem) {
+        messagesToConvert = [messages[0], ...sliced];
+      } else {
+        messagesToConvert = sliced;
+      }
+    }
+  }
+
   let history = [];
   let currentMessage = null;
+
+  messages = messagesToConvert;
 
   const clientProvidedTools = tools && tools.length > 0;
 
