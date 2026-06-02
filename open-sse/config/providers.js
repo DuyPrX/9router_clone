@@ -247,7 +247,14 @@ export const PROVIDERS = {
   },
   nvidia: {
     baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions",
-    format: "openai"
+    format: "openai",
+    // NIM occasionally stalls during connection setup. Fail fast so combos can move on.
+    fetchConnectTimeoutMs: 10 * 1000,
+    retry: {
+      502: { attempts: 0, delayMs: 0 },
+      503: { attempts: 1, delayMs: 1000 },
+      504: { attempts: 1, delayMs: 1000 }
+    }
   },
   anthropic: {
     baseUrl: "https://api.anthropic.com/v1/messages",

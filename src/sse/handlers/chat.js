@@ -30,6 +30,12 @@ function isDeterministicPayloadError(status, errorText) {
     text.includes("too many tokens");
 }
 
+function isNonAccountRecoverableError(provider, status, errorText) {
+  if (isDeterministicPayloadError(status, errorText)) return true;
+  const text = typeof errorText === "string" ? errorText.toLowerCase() : "";
+  return provider === "nvidia" && status === HTTP_STATUS.BAD_GATEWAY && text.includes("fetch connect timeout");
+}
+
 /**
  * Handle chat completion request
  * Supports: OpenAI, Claude, Gemini, OpenAI Responses API formats
@@ -248,8 +254,8 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       lastError = result.error;
       lastStatus = result.status;
 
-      if (isDeterministicPayloadError(result.status, result.error)) {
-        log.warn("AUTH", `Account ${credentials.connectionName} failed with deterministic payload error (${result.status}); skipping same-provider account retry`);
+      if (isNonAccountRecoverableError(provider, result.status, result.error)) {
+        log.warn("AUTH", `Account ${credentials.connectionName} failed with non-account-recoverable error (${result.status}); skipping same-provider account retry`);
         return result.response;
       }
 
