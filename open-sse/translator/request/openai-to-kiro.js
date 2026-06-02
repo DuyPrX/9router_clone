@@ -26,9 +26,16 @@ function formatLocalContextTime(date = new Date()) {
  * Convert OpenAI messages to Kiro format
  * Rules: system/tool/user -> user role, merge consecutive same roles
  */
+function getMaxHistoryTurns(messages, tools) {
+  const toolCount = Array.isArray(tools) ? tools.length : 0;
+  if (toolCount >= 50 || messages.length >= 120) return 3;
+  if (toolCount >= 25 || messages.length >= 80) return 4;
+  return 6;
+}
+
 function convertMessages(messages, tools, model) {
   let messagesToConvert = messages;
-  const maxHistoryTurns = 6; // Keep at most 6 complete turns of history to prevent upstream stall/latency
+  const maxHistoryTurns = getMaxHistoryTurns(messages, tools);
   if (messages.length > 15) { // Only truncate if history is relatively long
     let userTurnsCount = 0;
     let cutIdx = 0;

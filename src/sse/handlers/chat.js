@@ -20,6 +20,16 @@ import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
 
+function isDeterministicPayloadError(status, errorText) {
+  if (status !== HTTP_STATUS.BAD_REQUEST) return false;
+  const text = typeof errorText === "string" ? errorText.toLowerCase() : "";
+  return text.includes("content_length_exceeds_threshold") ||
+    text.includes("input is too long") ||
+    text.includes("context length") ||
+    text.includes("maximum context") ||
+    text.includes("too many tokens");
+}
+
 /**
  * Handle chat completion request
  * Supports: OpenAI, Claude, Gemini, OpenAI Responses API formats
@@ -235,10 +245,16 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
     const { shouldFallback } = await markAccountUnavailable(credentials.connectionId, result.status, result.error, provider, model, result.resetsAtMs);
 
     if (shouldFallback) {
-      log.warn("AUTH", `Account ${credentials.connectionName} unavailable (${result.status}), trying fallback`);
-      excludeConnectionIds.add(credentials.connectionId);
       lastError = result.error;
       lastStatus = result.status;
+
+      if (isDeterministicPayloadError(result.status, result.error)) {
+        log.warn("AUTH", `Account ${credentials.connectionName} failed with deterministic payload error (${result.status}); skipping same-provider account retry`);
+        return result.response;
+      }
+
+      log.warn("AUTH", `Account ${credentials.connectionName} unavailable (${result.status}), trying fallback`);
+      excludeConnectionIds.add(credentials.connectionId);
       continue;
     }
 
