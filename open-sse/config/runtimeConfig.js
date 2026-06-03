@@ -37,6 +37,12 @@ export const STREAM_STALL_TIMEOUT_MS = process.env.STREAM_STALL_TIMEOUT_MS
   ? Math.max(5000, parseInt(process.env.STREAM_STALL_TIMEOUT_MS, 10))
   : 90 * 1000;
 
+// Stream max duration: abort even if upstream keepalive bytes prevent idle stall detection.
+// Configurable via STREAM_MAX_DURATION_MS env var (ms).
+export const STREAM_MAX_DURATION_MS = process.env.STREAM_MAX_DURATION_MS
+  ? Math.max(30 * 1000, parseInt(process.env.STREAM_MAX_DURATION_MS, 10))
+  : 5 * 60 * 1000;
+
 // Fetch connect timeout: abort if upstream does not return response headers within this duration.
 // Configurable via FETCH_CONNECT_TIMEOUT_MS env var (ms). Defaults tuned for slow upstream handshakes.
 export const FETCH_CONNECT_TIMEOUT_MS = process.env.FETCH_CONNECT_TIMEOUT_MS

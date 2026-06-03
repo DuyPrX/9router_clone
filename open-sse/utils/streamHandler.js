@@ -1,5 +1,5 @@
 // Stream handler with disconnect detection - shared for all providers
-import { STREAM_STALL_TIMEOUT_MS } from "../config/runtimeConfig.js";
+import { STREAM_MAX_DURATION_MS, STREAM_STALL_TIMEOUT_MS } from "../config/runtimeConfig.js";
 import { dbg, isDebugEnabled } from "./debugLog.js";
 
 // Get HH:MM:SS timestamp
@@ -166,8 +166,10 @@ export function createDisconnectAwareStream(transformStream, streamController) {
  * Measuring stall on the transform output caused false stalls and the
  * "failed to pipe response" error in Next.
  *
- * Any upstream chunk resets the timer. If no bytes arrive for
+ * Any upstream chunk resets the stall timer. If no bytes arrive for
  * STREAM_STALL_TIMEOUT_MS, abort the underlying fetch via the controller.
+ * STREAM_MAX_DURATION_MS is a hard cap for providers that keep the socket
+ * alive but stop producing useful stream completion.
  *
  * @param {Response} providerResponse - Response from provider
  * @param {TransformStream} transformStream - Transform stream for SSE
@@ -175,6 +177,7 @@ export function createDisconnectAwareStream(transformStream, streamController) {
  */
 export function pipeWithDisconnect(providerResponse, transformStream, streamController) {
   let stallTimer = null;
+  let maxDurationTimer = null;
   let chunkCount = 0;
   let totalBytes = 0;
   let lastChunkAt = Date.now();
@@ -182,6 +185,13 @@ export function pipeWithDisconnect(providerResponse, transformStream, streamCont
   const tag = "STREAM";
   const clearStall = () => {
     if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
+  };
+  const clearMaxDuration = () => {
+    if (maxDurationTimer) { clearTimeout(maxDurationTimer); maxDurationTimer = null; }
+  };
+  const clearTimers = () => {
+    clearStall();
+    clearMaxDuration();
   };
   const armStall = () => {
     clearStall();
@@ -193,21 +203,28 @@ export function pipeWithDisconnect(providerResponse, transformStream, streamCont
     }, STREAM_STALL_TIMEOUT_MS);
   };
 
-  // Wrap controller so every termination path clears the stall timer.
-  // Without this, abort/cancel/downstream-error paths leave the timer armed
+  maxDurationTimer = setTimeout(() => {
+    maxDurationTimer = null;
+    dbg(tag, `MAX DURATION ${STREAM_MAX_DURATION_MS}ms | chunks=${chunkCount} | bytes=${totalBytes} | sinceLast=${Date.now() - lastChunkAt}ms`);
+    streamController.handleError?.(new Error("stream max duration exceeded"));
+    streamController.abort?.();
+  }, STREAM_MAX_DURATION_MS);
+
+  // Wrap controller so every termination path clears stream timers.
+  // Without this, abort/cancel/downstream-error paths leave timers armed
   // and a stale abort could fire after the request has already ended.
   const wrappedController = {
     signal: streamController.signal,
     startTime: streamController.startTime,
     isConnected: () => streamController.isConnected(),
-    handleComplete: () => { dbg(tag, `complete | chunks=${chunkCount} | bytes=${totalBytes} | dur=${Date.now() - t0}ms`); clearStall(); streamController.handleComplete(); },
-    handleError: (e) => { dbg(tag, `error: ${e?.message} | chunks=${chunkCount} | bytes=${totalBytes} | dur=${Date.now() - t0}ms`); clearStall(); streamController.handleError(e); },
-    handleDisconnect: (r) => { dbg(tag, `disconnect: ${r} | chunks=${chunkCount} | bytes=${totalBytes} | dur=${Date.now() - t0}ms`); clearStall(); streamController.handleDisconnect(r); },
-    abort: () => { clearStall(); streamController.abort(); }
+    handleComplete: () => { dbg(tag, `complete | chunks=${chunkCount} | bytes=${totalBytes} | dur=${Date.now() - t0}ms`); clearTimers(); streamController.handleComplete(); },
+    handleError: (e) => { dbg(tag, `error: ${e?.message} | chunks=${chunkCount} | bytes=${totalBytes} | dur=${Date.now() - t0}ms`); clearTimers(); streamController.handleError(e); },
+    handleDisconnect: (r) => { dbg(tag, `disconnect: ${r} | chunks=${chunkCount} | bytes=${totalBytes} | dur=${Date.now() - t0}ms`); clearTimers(); streamController.handleDisconnect(r); },
+    abort: () => { clearTimers(); streamController.abort(); }
   };
 
   armStall();
-  dbg(tag, `pipe start | stallTimeout=${STREAM_STALL_TIMEOUT_MS}ms`);
+  dbg(tag, `pipe start | stallTimeout=${STREAM_STALL_TIMEOUT_MS}ms | maxDuration=${STREAM_MAX_DURATION_MS}ms`);
 
   const upstreamTap = new TransformStream({
     transform(chunk, controller) {
@@ -223,7 +240,7 @@ export function pipeWithDisconnect(providerResponse, transformStream, streamCont
       armStall();
       controller.enqueue(chunk);
     },
-    flush() { dbg(tag, `upstream EOF | chunks=${chunkCount} | bytes=${totalBytes} | dur=${Date.now() - t0}ms`); clearStall(); }
+    flush() { dbg(tag, `upstream EOF | chunks=${chunkCount} | bytes=${totalBytes} | dur=${Date.now() - t0}ms`); clearTimers(); }
   });
 
   const transformedBody = providerResponse.body
