@@ -100,8 +100,6 @@ export async function handleChat(request, clientRawRequest = null) {
   const toolCount = body.tools?.length || 0;
   const effort = body.reasoning_effort || body.reasoning?.effort || null;
   log.request("POST", `${url.pathname} | ${modelStr} | ${msgCount} msgs${toolCount ? ` | ${toolCount} tools` : ""}${effort ? ` | effort=${effort}` : ""}`);
-  const toolSummary = summarizeToolSources(body.tools);
-  if (toolSummary) log.debug("TOOLS", toolSummary);
 
   // Log API key (masked)
   const authHeader = request.headers.get("Authorization");
@@ -115,6 +113,11 @@ export async function handleChat(request, clientRawRequest = null) {
 
   // Enforce API key if enabled in settings
   const settings = await getSettings();
+  if (settings.logToolSources === true) {
+    const toolSummary = summarizeToolSources(body.tools);
+    if (toolSummary) log.debug("TOOLS", toolSummary);
+  }
+
   if (settings.requireApiKey) {
     if (!apiKey) {
       log.warn("AUTH", "Missing API key (requireApiKey=true)");
