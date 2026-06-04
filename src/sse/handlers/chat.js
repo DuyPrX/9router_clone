@@ -20,6 +20,36 @@ import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
 
+function getToolName(tool) {
+  return tool?.name || tool?.function?.name || tool?.type || "unknown";
+}
+
+function getToolSource(name) {
+  if (name.startsWith("mcp__")) {
+    const parts = name.split("__");
+    return parts[1] ? `mcp:${parts[1]}` : "mcp";
+  }
+  if (name.startsWith("web_search") || name.startsWith("web_fetch")) return "hosted:web";
+  if (name.startsWith("computer_") || name.startsWith("str_replace_")) return "hosted:computer";
+  return "client";
+}
+
+function summarizeToolSources(tools) {
+  if (!Array.isArray(tools) || tools.length === 0) return null;
+  const names = tools.map(getToolName);
+  const sourceCounts = new Map();
+  for (const name of names) {
+    const source = getToolSource(name);
+    sourceCounts.set(source, (sourceCounts.get(source) || 0) + 1);
+  }
+  const sources = Array.from(sourceCounts.entries())
+    .map(([source, count]) => `${source}=${count}`)
+    .join(", ");
+  const visibleNames = names.slice(0, 80).join(", ");
+  const suffix = names.length > 80 ? `, ... +${names.length - 80} more` : "";
+  return `${tools.length} tools | sources: ${sources} | names: ${visibleNames}${suffix}`;
+}
+
 function isDeterministicPayloadError(status, errorText) {
   if (status !== HTTP_STATUS.BAD_REQUEST) return false;
   const text = typeof errorText === "string" ? errorText.toLowerCase() : "";
@@ -70,6 +100,8 @@ export async function handleChat(request, clientRawRequest = null) {
   const toolCount = body.tools?.length || 0;
   const effort = body.reasoning_effort || body.reasoning?.effort || null;
   log.request("POST", `${url.pathname} | ${modelStr} | ${msgCount} msgs${toolCount ? ` | ${toolCount} tools` : ""}${effort ? ` | effort=${effort}` : ""}`);
+  const toolSummary = summarizeToolSources(body.tools);
+  if (toolSummary) log.debug("TOOLS", toolSummary);
 
   // Log API key (masked)
   const authHeader = request.headers.get("Authorization");
