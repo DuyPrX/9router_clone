@@ -404,7 +404,15 @@ export const PROVIDERS = {
   },
   "xiaomi-tokenplan": {
     baseUrl: "https://token-plan-sgp.xiaomimimo.com/v1/chat/completions",
-    format: "openai"
+    format: "openai",
+    // Claude-native TokenPlan requests intentionally use upstream stream=false
+    // and synthesize SSE back to Claude clients. Xiaomi will not send response
+    // headers until the full non-streaming response is ready, so the default
+    // 60s header timeout can abort healthy large agent requests.
+    fetchConnectTimeoutMs: 5 * 60 * 1000,
+    retry: {
+      502: { attempts: 0, delayMs: 0 }
+    }
   },
   // Region map for Xiaomi MiMo Token Plan (keys are cluster-specific)
   // Used by resolveXiaomiTokenplanBaseUrl below
