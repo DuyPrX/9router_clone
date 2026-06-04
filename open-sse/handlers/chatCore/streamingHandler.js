@@ -5,6 +5,121 @@ import { pipeWithDisconnect } from "../../utils/streamHandler.js";
 import { buildRequestDetail, extractRequestConfig, saveUsageStats } from "./requestDetail.js";
 import { saveRequestDetail } from "@/lib/usageDb.js";
 
+
+const encoder = new TextEncoder();
+
+function sseEvent(event, data) {
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+}
+
+function normalizeClaudeUsage(usage = {}) {
+  const inputTokens = usage.input_tokens || usage.prompt_tokens || 0;
+  const outputTokens = usage.output_tokens || usage.completion_tokens || 0;
+  const cacheRead = usage.cache_read_input_tokens || 0;
+  const cacheCreate = usage.cache_creation_input_tokens || 0;
+  const normalized = {
+    prompt_tokens: inputTokens,
+    completion_tokens: outputTokens,
+    total_tokens: inputTokens + outputTokens,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens
+  };
+  if (cacheRead > 0) normalized.cache_read_input_tokens = cacheRead;
+  if (cacheCreate > 0) normalized.cache_creation_input_tokens = cacheCreate;
+  return normalized;
+}
+
+function claudeJsonToSSEStream(responseBody, model) {
+  return new ReadableStream({
+    start(controller) {
+      const id = responseBody?.id || `msg_${Date.now()}`;
+      const responseModel = responseBody?.model || model;
+      const usage = responseBody?.usage || {};
+      const content = Array.isArray(responseBody?.content) ? responseBody.content : [];
+
+      controller.enqueue(encoder.encode(sseEvent("message_start", {
+        type: "message_start",
+        message: {
+          id,
+          type: "message",
+          role: "assistant",
+          model: responseModel,
+          content: [],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: {
+            input_tokens: usage.input_tokens || 0,
+            output_tokens: 0,
+            ...(usage.cache_read_input_tokens ? { cache_read_input_tokens: usage.cache_read_input_tokens } : {}),
+            ...(usage.cache_creation_input_tokens ? { cache_creation_input_tokens: usage.cache_creation_input_tokens } : {})
+          }
+        }
+      })));
+
+      content.forEach((block, index) => {
+        if (block?.type === "text") {
+          controller.enqueue(encoder.encode(sseEvent("content_block_start", {
+            type: "content_block_start",
+            index,
+            content_block: { type: "text", text: "" }
+          })));
+          if (block.text) {
+            controller.enqueue(encoder.encode(sseEvent("content_block_delta", {
+              type: "content_block_delta",
+              index,
+              delta: { type: "text_delta", text: block.text }
+            })));
+          }
+          controller.enqueue(encoder.encode(sseEvent("content_block_stop", { type: "content_block_stop", index })));
+        } else if (block?.type === "thinking") {
+          controller.enqueue(encoder.encode(sseEvent("content_block_start", {
+            type: "content_block_start",
+            index,
+            content_block: { type: "thinking", thinking: "", signature: block.signature || "" }
+          })));
+          if (block.thinking) {
+            controller.enqueue(encoder.encode(sseEvent("content_block_delta", {
+              type: "content_block_delta",
+              index,
+              delta: { type: "thinking_delta", thinking: block.thinking }
+            })));
+          }
+          controller.enqueue(encoder.encode(sseEvent("content_block_stop", { type: "content_block_stop", index })));
+        } else if (block?.type === "tool_use") {
+          controller.enqueue(encoder.encode(sseEvent("content_block_start", {
+            type: "content_block_start",
+            index,
+            content_block: { type: "tool_use", id: block.id, name: block.name, input: {} }
+          })));
+          const inputJson = JSON.stringify(block.input || {});
+          if (inputJson && inputJson !== "{}") {
+            controller.enqueue(encoder.encode(sseEvent("content_block_delta", {
+              type: "content_block_delta",
+              index,
+              delta: { type: "input_json_delta", partial_json: inputJson }
+            })));
+          }
+          controller.enqueue(encoder.encode(sseEvent("content_block_stop", { type: "content_block_stop", index })));
+        }
+      });
+
+      const stopReason = responseBody?.stop_reason || "end_turn";
+      controller.enqueue(encoder.encode(sseEvent("message_delta", {
+        type: "message_delta",
+        delta: { stop_reason: stopReason, stop_sequence: responseBody?.stop_sequence || null },
+        usage: {
+          output_tokens: usage.output_tokens || 0,
+          ...(usage.input_tokens ? { input_tokens: usage.input_tokens } : {}),
+          ...(usage.cache_read_input_tokens ? { cache_read_input_tokens: usage.cache_read_input_tokens } : {}),
+          ...(usage.cache_creation_input_tokens ? { cache_creation_input_tokens: usage.cache_creation_input_tokens } : {})
+        }
+      })));
+      controller.enqueue(encoder.encode(sseEvent("message_stop", { type: "message_stop" })));
+      controller.close();
+    }
+  });
+}
+
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream",
   "Cache-Control": "no-cache",
@@ -107,4 +222,59 @@ export function buildOnStreamComplete({ provider, model, connectionId, apiKey, r
   };
 
   return { onStreamComplete, streamDetailId };
+}
+
+/**
+ * Handle a non-streaming Claude JSON provider response while preserving a Claude SSE client contract.
+ * Used for providers whose upstream streaming path is unstable but whose non-streaming endpoint is reliable.
+ */
+export async function handleClaudeJsonAsStreamingResponse({ providerResponse, provider, model, body, stream, translatedBody, finalBody, requestStartTime, connectionId, apiKey, clientRawRequest, onRequestSuccess, reqLogger, streamController, onStreamComplete, trackDone, appendLog }) {
+  let responseBody;
+  try {
+    responseBody = await providerResponse.json();
+  } catch (err) {
+    streamController.handleError(err);
+    appendLog?.({ status: "FAILED 502" });
+    return {
+      success: false,
+      response: new Response(JSON.stringify({ error: { message: `Invalid JSON response from ${provider}` } }), {
+        status: 502,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      })
+    };
+  }
+
+  reqLogger?.logProviderResponse?.(providerResponse.status, providerResponse.statusText, providerResponse.headers, responseBody);
+  if (onRequestSuccess) await onRequestSuccess();
+
+  const usage = normalizeClaudeUsage(responseBody?.usage || {});
+  appendLog?.({ tokens: usage, status: "200 OK" });
+
+  const textContent = Array.isArray(responseBody?.content)
+    ? responseBody.content.filter(b => b?.type === "text").map(b => b.text || "").join("")
+    : "";
+  const thinking = Array.isArray(responseBody?.content)
+    ? responseBody.content.filter(b => b?.type === "thinking").map(b => b.thinking || "").join("")
+    : null;
+  onStreamComplete?.({ content: textContent, thinking }, usage, Date.now());
+  trackDone?.();
+  streamController.handleComplete();
+
+  saveRequestDetail(buildRequestDetail({
+    provider, model, connectionId,
+    latency: { ttft: Date.now() - requestStartTime, total: Date.now() - requestStartTime },
+    tokens: usage,
+    request: extractRequestConfig(body, stream),
+    providerRequest: finalBody || translatedBody || null,
+    providerResponse: responseBody || null,
+    response: { content: textContent, thinking, type: "streaming" },
+    status: "success"
+  }, { endpoint: clientRawRequest?.endpoint || null })).catch(err => {
+    console.error("[RequestDetail] Failed to save synthetic stream:", err.message);
+  });
+
+  return {
+    success: true,
+    response: new Response(claudeJsonToSSEStream(responseBody, model), { headers: SSE_HEADERS })
+  };
 }

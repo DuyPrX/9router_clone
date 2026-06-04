@@ -14,7 +14,7 @@ import { getExecutor } from "../executors/index.js";
 import { buildRequestDetail, extractRequestConfig } from "./chatCore/requestDetail.js";
 import { handleForcedSSEToJson } from "./chatCore/sseToJsonHandler.js";
 import { handleNonStreamingResponse } from "./chatCore/nonStreamingHandler.js";
-import { handleStreamingResponse, buildOnStreamComplete } from "./chatCore/streamingHandler.js";
+import { handleStreamingResponse, buildOnStreamComplete, handleClaudeJsonAsStreamingResponse } from "./chatCore/streamingHandler.js";
 import { detectClientTool, isNativePassthrough } from "../utils/clientDetector.js";
 import { dedupeTools } from "../utils/toolDeduper.js";
 import { injectCaveman } from "../rtk/caveman.js";
@@ -60,7 +60,8 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
 
   const clientRequestedStreaming = body.stream === true || sourceFormat === FORMATS.ANTIGRAVITY || sourceFormat === FORMATS.GEMINI || sourceFormat === FORMATS.GEMINI_CLI;
   const providerRequiresStreaming = provider === "openai" || provider === "codex" || provider === "commandcode";
-  let stream = providerRequiresStreaming ? true : (body.stream !== false);
+  const synthesizeClaudeStream = provider === "xiaomi-tokenplan" && modelTargetFormat === FORMATS.CLAUDE && sourceFormat === FORMATS.CLAUDE && body.stream === true;
+  let stream = synthesizeClaudeStream ? false : (providerRequiresStreaming ? true : (body.stream !== false));
 
   // DeepSeek-TUI: interactive TUI panel sends stream:true and needs SSE.
   // Non-interactive mode (-p flag) sends without stream and can't parse SSE.
@@ -80,7 +81,7 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   const reqLogger = await createRequestLogger(sourceFormat, targetFormat, model);
   if (clientRawRequest) reqLogger.logClientRawRequest(clientRawRequest.endpoint, clientRawRequest.body, clientRawRequest.headers);
   reqLogger.logRawRequest(body);
-  log?.debug?.("FORMAT", `${sourceFormat} → ${targetFormat} | stream=${stream}`);
+  log?.debug?.("FORMAT", `${sourceFormat} → ${targetFormat} | stream=${stream}${synthesizeClaudeStream ? " | synthesizeStream=true" : ""}`);
 
   // Native passthrough: CLI tool and provider are the same ecosystem
   // Skip all translation/normalization — only model and Bearer are swapped
@@ -101,6 +102,10 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     toolNameMap = translatedBody._toolNameMap;
     delete translatedBody._toolNameMap;
     translatedBody.model = upstreamModel;
+  }
+
+  if (targetFormat === FORMATS.CLAUDE && translatedBody && translatedBody.stream !== stream) {
+    translatedBody.stream = stream;
   }
 
   // Dedupe duplicate built-in tools when equivalent MCP tools are present (Claude clients only).
@@ -260,6 +265,13 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     if (result) { streamController.handleComplete(); return result; }
   }
 
+  // Streaming response synthesized from a non-streaming upstream response.
+  // This keeps Claude Code on SSE while avoiding flaky provider stream sockets.
+  const { onStreamComplete } = buildOnStreamComplete({ ...sharedCtx });
+  if (synthesizeClaudeStream) {
+    return handleClaudeJsonAsStreamingResponse({ ...sharedCtx, providerResponse, reqLogger, streamController, onStreamComplete, trackDone, appendLog });
+  }
+
   // True non-streaming response
   if (!stream) {
     const result = await handleNonStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat, reqLogger, toolNameMap, trackDone, appendLog });
@@ -268,7 +280,6 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   }
 
   // Streaming response
-  const { onStreamComplete } = buildOnStreamComplete({ ...sharedCtx });
   return handleStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat, userAgent, reqLogger, toolNameMap, streamController, onStreamComplete });
 }
 
