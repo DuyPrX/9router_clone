@@ -636,6 +636,7 @@ export const PROVIDER_MODELS = {
 
   // === Free-tier providers (synced from OmniRoute) ===
   agentrouter: [
+    { id: "claude-sonnet-4-6", name: "Claude 4.6 Sonnet" },
     { id: "claude-opus-4-6", name: "Claude 4.6 Opus" },
     { id: "claude-haiku-4-5-20251001", name: "Claude 4.5 Haiku" },
     { id: "glm-5.1", name: "GLM 5.1" },
