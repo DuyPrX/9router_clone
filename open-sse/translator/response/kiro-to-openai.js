@@ -16,6 +16,11 @@ function chunkMeta(state) {
   return { id: state.responseId, created: state.created, model: state.model || "kiro" };
 }
 
+function shouldSuppressKiroThinking(state) {
+  const model = String(state?.model || "").toLowerCase();
+  return model.includes("thinking-agentic");
+}
+
 /**
  * Parse Kiro SSE event and convert to OpenAI format
  * Kiro events: assistantResponseEvent, codeEvent, supplementaryWebLinksEvent, etc.
@@ -92,6 +97,8 @@ export function kiroToOpenAIResponse(chunk, state) {
   // this as OpenAI delta.reasoning_content so downstream translators can map
   // it to Claude thinking blocks / Anthropic reasoning / etc.
   if (eventType === "reasoningContentEvent" || data.reasoningContentEvent) {
+    if (shouldSuppressKiroThinking(state)) return null;
+
     const reasoning = data.reasoningContentEvent || data;
     const content = (typeof reasoning === "string")
       ? reasoning
