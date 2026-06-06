@@ -3,6 +3,7 @@ import { needsTranslation } from "../../translator/index.js";
 import { createSSETransformStreamWithLogger, createPassthroughStreamWithLogger } from "../../utils/stream.js";
 import { pipeWithDisconnect } from "../../utils/streamHandler.js";
 import { PROVIDERS } from "../../config/providers.js";
+import { buildAbortedResponsesTerminalBytes } from "../../utils/responsesStreamHelpers.js";
 import { buildRequestDetail, extractRequestConfig, saveUsageStats } from "./requestDetail.js";
 import { saveRequestDetail } from "@/lib/usageDb.js";
 
@@ -160,9 +161,13 @@ export function handleStreamingResponse({ providerResponse, provider, model, sou
 
   const transformStream = buildTransformStream({ provider, sourceFormat, targetFormat, userAgent, reqLogger, toolNameMap, model, connectionId, body, onStreamComplete, apiKey });
   const providerConfig = PROVIDERS[provider] || {};
+  // Responses passthrough: synthesize response.failed + [DONE] if the stream aborts/stalls before a terminal event
+  const isResponsesPassthrough = sourceFormat === FORMATS.OPENAI_RESPONSES && targetFormat === FORMATS.OPENAI_RESPONSES;
+  const onAbortTerminal = isResponsesPassthrough ? buildAbortedResponsesTerminalBytes : null;
   const transformedBody = pipeWithDisconnect(providerResponse, transformStream, streamController, {
     stallTimeoutMs: providerConfig.streamStallTimeoutMs,
-    maxDurationMs: providerConfig.streamMaxDurationMs
+    maxDurationMs: providerConfig.streamMaxDurationMs,
+    onAbortTerminal
   });
 
   const streamDetailId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;

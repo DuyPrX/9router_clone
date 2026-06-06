@@ -1,4 +1,5 @@
 import { HTTP_STATUS, RETRY_CONFIG, DEFAULT_RETRY_CONFIG, resolveRetryEntry, FETCH_CONNECT_TIMEOUT_MS } from "../config/runtimeConfig.js";
+import { shouldRefreshCredentials } from "../services/oauthCredentialManager.js";
 import { proxyAwareFetch } from "../utils/proxyFetch.js";
 import { dbg } from "../utils/debugLog.js";
 
@@ -87,9 +88,7 @@ export class BaseExecutor {
   }
 
   needsRefresh(credentials) {
-    if (!credentials.expiresAt) return false;
-    const expiresAtMs = new Date(credentials.expiresAt).getTime();
-    return expiresAtMs - Date.now() < 5 * 60 * 1000;
+    return shouldRefreshCredentials(this.provider, credentials);
   }
 
   parseError(response, bodyText) {
@@ -123,7 +122,7 @@ export class BaseExecutor {
       if (!retryAttemptsByUrl[urlIndex]) retryAttemptsByUrl[urlIndex] = 0;
 
       // Abort if upstream does not return response headers within the configured duration
-      const connectTimeoutMs = this.config.fetchConnectTimeoutMs || FETCH_CONNECT_TIMEOUT_MS;
+      const connectTimeoutMs = this.config.fetchConnectTimeoutMs || this.config?.timeoutMs || FETCH_CONNECT_TIMEOUT_MS;
       const connectCtrl = new AbortController();
       const connectTimer = setTimeout(() => connectCtrl.abort(new Error("fetch connect timeout")), connectTimeoutMs);
       const mergedSignal = signal ? AbortSignal.any([signal, connectCtrl.signal]) : connectCtrl.signal;
