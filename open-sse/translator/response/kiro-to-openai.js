@@ -5,6 +5,11 @@
 import { register } from "../index.js";
 import { FORMATS } from "../formats.js";
 
+function shouldSuppressKiroThinking(state) {
+  const model = String(state?.model || "").toLowerCase();
+  return model.includes("thinking-agentic");
+}
+
 /**
  * Parse Kiro SSE event and convert to OpenAI format
  * Kiro events: assistantResponseEvent, codeEvent, supplementaryWebLinksEvent, etc.
@@ -91,6 +96,8 @@ export function convertKiroToOpenAI(chunk, state) {
   // this as OpenAI delta.reasoning_content so downstream translators can map
   // it to Claude thinking blocks / Anthropic reasoning / etc.
   if (eventType === "reasoningContentEvent" || data.reasoningContentEvent) {
+    if (shouldSuppressKiroThinking(state)) return null;
+
     const reasoning = data.reasoningContentEvent || data;
     const content = (typeof reasoning === "string")
       ? reasoning
