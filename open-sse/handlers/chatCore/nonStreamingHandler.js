@@ -152,6 +152,26 @@ export async function handleNonStreamingResponse({ providerResponse, provider, m
   }
 
   reqLogger.logProviderResponse(providerResponse.status, providerResponse.statusText, providerResponse.headers, responseBody);
+
+  // Some providers return HTTP 200 with an application-level error body.
+  // iFlow uses this shape for unsupported models, which otherwise becomes an empty success.
+  if (provider === "iflow" && responseBody?.status && String(responseBody.status) !== "0" && responseBody.body == null) {
+    const upstreamStatus = String(responseBody.status);
+    const message = responseBody.msg || responseBody.message || `iFlow application error ${upstreamStatus}`;
+    appendLog({ status: `FAILED ${HTTP_STATUS.BAD_GATEWAY}` });
+    saveRequestDetail(buildRequestDetail({
+      provider, model, connectionId,
+      latency: { ttft: 0, total: Date.now() - requestStartTime },
+      tokens: { prompt_tokens: 0, completion_tokens: 0 },
+      request: extractRequestConfig(body, stream),
+      providerRequest: finalBody || translatedBody || null,
+      providerResponse: responseBody || null,
+      response: { error: message, status: upstreamStatus, thinking: null },
+      status: "error"
+    }, { endpoint: clientRawRequest?.endpoint || null })).catch(() => { });
+    return createErrorResult(HTTP_STATUS.BAD_GATEWAY, `${provider}: ${message}`);
+  }
+
   if (onRequestSuccess) await onRequestSuccess();
 
   // Decloak tool_use names once on raw Claude body, before any translation (INPUT side)
