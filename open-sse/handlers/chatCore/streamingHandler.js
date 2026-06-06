@@ -2,6 +2,7 @@ import { FORMATS } from "../../translator/formats.js";
 import { needsTranslation } from "../../translator/index.js";
 import { createSSETransformStreamWithLogger, createPassthroughStreamWithLogger } from "../../utils/stream.js";
 import { pipeWithDisconnect } from "../../utils/streamHandler.js";
+import { PROVIDERS } from "../../config/providers.js";
 import { buildRequestDetail, extractRequestConfig, saveUsageStats } from "./requestDetail.js";
 import { saveRequestDetail } from "@/lib/usageDb.js";
 
@@ -158,7 +159,11 @@ export function handleStreamingResponse({ providerResponse, provider, model, sou
   if (onRequestSuccess) onRequestSuccess();
 
   const transformStream = buildTransformStream({ provider, sourceFormat, targetFormat, userAgent, reqLogger, toolNameMap, model, connectionId, body, onStreamComplete, apiKey });
-  const transformedBody = pipeWithDisconnect(providerResponse, transformStream, streamController);
+  const providerConfig = PROVIDERS[provider] || {};
+  const transformedBody = pipeWithDisconnect(providerResponse, transformStream, streamController, {
+    stallTimeoutMs: providerConfig.streamStallTimeoutMs,
+    maxDurationMs: providerConfig.streamMaxDurationMs
+  });
 
   const streamDetailId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   saveRequestDetail(buildRequestDetail({

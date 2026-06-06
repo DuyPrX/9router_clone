@@ -371,7 +371,10 @@ export const PROVIDERS = {
     baseUrl: "https://opencode.ai",
     format: "openai",
     headers: { "x-opencode-client": "desktop" },
-    noAuth: true
+    noAuth: true,
+    // Public OpenCode streams can keep the socket alive after useful output.
+    // Fail faster than the global 5-minute cap so agent sessions can recover.
+    streamMaxDurationMs: 90 * 1000
   },
   "opencode-go": {
     baseUrl: "https://opencode.ai/zen/go/v1/chat/completions",

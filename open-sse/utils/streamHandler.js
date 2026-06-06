@@ -175,7 +175,7 @@ export function createDisconnectAwareStream(transformStream, streamController) {
  * @param {TransformStream} transformStream - Transform stream for SSE
  * @param {object} streamController - Stream controller from createStreamController
  */
-export function pipeWithDisconnect(providerResponse, transformStream, streamController) {
+export function pipeWithDisconnect(providerResponse, transformStream, streamController, options = {}) {
   let stallTimer = null;
   let maxDurationTimer = null;
   let chunkCount = 0;
@@ -183,6 +183,8 @@ export function pipeWithDisconnect(providerResponse, transformStream, streamCont
   let lastChunkAt = Date.now();
   const t0 = Date.now();
   const tag = "STREAM";
+  const stallTimeoutMs = options.stallTimeoutMs || STREAM_STALL_TIMEOUT_MS;
+  const maxDurationMs = options.maxDurationMs || STREAM_MAX_DURATION_MS;
   const clearStall = () => {
     if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; }
   };
@@ -197,18 +199,18 @@ export function pipeWithDisconnect(providerResponse, transformStream, streamCont
     clearStall();
     stallTimer = setTimeout(() => {
       stallTimer = null;
-      dbg(tag, `STALL TIMEOUT ${STREAM_STALL_TIMEOUT_MS}ms | chunks=${chunkCount} | bytes=${totalBytes} | sinceLast=${Date.now() - lastChunkAt}ms`);
+      dbg(tag, `STALL TIMEOUT ${stallTimeoutMs}ms | chunks=${chunkCount} | bytes=${totalBytes} | sinceLast=${Date.now() - lastChunkAt}ms`);
       streamController.handleError?.(new Error("stream stall timeout"));
       streamController.abort?.();
-    }, STREAM_STALL_TIMEOUT_MS);
+    }, stallTimeoutMs);
   };
 
   maxDurationTimer = setTimeout(() => {
     maxDurationTimer = null;
-    dbg(tag, `MAX DURATION ${STREAM_MAX_DURATION_MS}ms | chunks=${chunkCount} | bytes=${totalBytes} | sinceLast=${Date.now() - lastChunkAt}ms`);
+    dbg(tag, `MAX DURATION ${maxDurationMs}ms | chunks=${chunkCount} | bytes=${totalBytes} | sinceLast=${Date.now() - lastChunkAt}ms`);
     streamController.handleError?.(new Error("stream max duration exceeded"));
     streamController.abort?.();
-  }, STREAM_MAX_DURATION_MS);
+  }, maxDurationMs);
 
   // Wrap controller so every termination path clears stream timers.
   // Without this, abort/cancel/downstream-error paths leave timers armed
@@ -224,7 +226,7 @@ export function pipeWithDisconnect(providerResponse, transformStream, streamCont
   };
 
   armStall();
-  dbg(tag, `pipe start | stallTimeout=${STREAM_STALL_TIMEOUT_MS}ms | maxDuration=${STREAM_MAX_DURATION_MS}ms`);
+  dbg(tag, `pipe start | stallTimeout=${stallTimeoutMs}ms | maxDuration=${maxDurationMs}ms`);
 
   const upstreamTap = new TransformStream({
     transform(chunk, controller) {
