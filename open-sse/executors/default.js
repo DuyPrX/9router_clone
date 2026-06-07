@@ -23,10 +23,16 @@ export class DefaultExecutor extends BaseExecutor {
     super(provider, PROVIDERS[provider] || PROVIDERS.openai);
   }
 
-  transformRequest(model, body) {
+  transformRequest(model, body, stream) {
     const transformed = this.applyJsonSchemaFallback(body);
     const upstreamModel = stripXiaomiClaudeSuffix(model);
     const withModel = upstreamModel !== model ? { ...transformed, model: upstreamModel } : transformed;
+
+    if (!stream && withModel?.stream_options) {
+      const { stream_options, ...withoutStreamOptions } = withModel;
+      return injectReasoningContent({ provider: this.provider, model: upstreamModel, body: withoutStreamOptions });
+    }
+
     return injectReasoningContent({ provider: this.provider, model: upstreamModel, body: withModel });
   }
 

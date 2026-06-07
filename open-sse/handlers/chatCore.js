@@ -59,7 +59,8 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   }
 
   const clientRequestedStreaming = body.stream === true || sourceFormat === FORMATS.ANTIGRAVITY || sourceFormat === FORMATS.GEMINI || sourceFormat === FORMATS.GEMINI_CLI;
-  const providerRequiresStreaming = provider === "openai" || provider === "codex" || provider === "commandcode";
+  const providerRequiresStreaming = provider === "openai" || provider === "codex" || provider === "commandcode" ||
+    (provider === "agentrouter" && model === "glm-5.1");
   const synthesizeClaudeStream = provider === "xiaomi-tokenplan" && modelTargetFormat === FORMATS.CLAUDE && sourceFormat === FORMATS.CLAUDE && body.stream === true;
   let stream = synthesizeClaudeStream ? false : (providerRequiresStreaming ? true : (body.stream !== false));
 

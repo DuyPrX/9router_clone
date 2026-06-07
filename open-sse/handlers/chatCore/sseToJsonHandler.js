@@ -57,6 +57,25 @@ export function parseSSEToOpenAIResponse(rawSSE, fallbackModel) {
   for (const chunk of chunks) {
     const choice = chunk?.choices?.[0];
     const delta = choice?.delta || {};
+
+    if (!choice && chunk?.type === "content_block_delta") {
+      const claudeDelta = chunk.delta || {};
+      if (typeof claudeDelta.text === "string" && claudeDelta.text.length > 0) contentParts.push(claudeDelta.text);
+      if (typeof claudeDelta.thinking === "string" && claudeDelta.thinking.length > 0) reasoningParts.push(claudeDelta.thinking);
+      continue;
+    }
+    if (!choice && chunk?.type === "message_delta") {
+      const stopReason = chunk.delta?.stop_reason;
+      if (stopReason) finishReason = stopReason === "end_turn" ? "stop" : stopReason;
+      if (chunk.usage && typeof chunk.usage === "object") {
+        const input = chunk.usage.input_tokens || 0;
+        const output = chunk.usage.output_tokens || 0;
+        usage = { prompt_tokens: input, completion_tokens: output, total_tokens: input + output };
+      }
+      continue;
+    }
+    if (!choice) continue;
+
     if (typeof delta.content === "string" && delta.content.length > 0) contentParts.push(delta.content);
     if (typeof delta.reasoning_content === "string" && delta.reasoning_content.length > 0) reasoningParts.push(delta.reasoning_content);
     if (choice?.finish_reason) finishReason = choice.finish_reason;
