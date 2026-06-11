@@ -66,9 +66,16 @@ function hasAgentRouterBlockedMonitorPrompt(body) {
   });
 }
 
-function isUnsupportedToolModel(provider, model, body) {
-  const hasTools = Array.isArray(body?.tools) && body.tools.length > 0;
-  return hasTools && provider === "opencode" && typeof model === "string" && model.startsWith("nemotron-");
+function tuneNemotronRequest(provider, model, body) {
+  if (provider !== "opencode" || typeof model !== "string" || !model.startsWith("nemotron-") || !body) {
+    return false;
+  }
+
+  body.include_reasoning = false;
+  body.reasoning = { ...(body.reasoning || {}), enabled: false };
+  if (body.temperature === undefined || body.temperature === null) body.temperature = 0;
+  if (Array.isArray(body.tools) && body.tools.length > 0 && !body.tool_choice) body.tool_choice = "auto";
+  return true;
 }
 
 /**
@@ -189,9 +196,8 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     if (sanitized > 0) log?.debug?.("AGENTROUTER", `sanitized ${sanitized} system block(s)`);
   }
 
-  if (isUnsupportedToolModel(provider, model, translatedBody)) {
-    log?.warn?.("TOOLS", `${provider}/${model} is not reliable for tool calls; use combo fallback`);
-    return createErrorResult(HTTP_STATUS.BAD_GATEWAY, `${provider}/${model} is not reliable for tool calls; falling back`);
+  if (tuneNemotronRequest(provider, model, translatedBody)) {
+    log?.debug?.("NEMOTRON", "reasoning disabled; tool_choice auto; temperature pinned");
   }
 
   // RTK: compress tool_result content
