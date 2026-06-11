@@ -14,6 +14,10 @@ function stripXiaomiClaudeSuffix(model) {
   return isXiaomiClaudeModel(model) ? model.slice(0, -"-claude".length) : model;
 }
 
+function isAgentRouterClaudeModel(model) {
+  return typeof model === "string" && model.startsWith("claude-");
+}
+
 function xiaomiTokenplanAnthropicBaseUrl(credentials) {
   return resolveXiaomiTokenplanBaseUrl(credentials).replace(/\/v1\/?$/, "/anthropic/v1");
 }
@@ -68,6 +72,10 @@ export class DefaultExecutor extends BaseExecutor {
       const normalized = baseUrl.replace(/\/$/, "");
       return `${normalized}/messages`;
     }
+    if (this.provider === "agentrouter" && !isAgentRouterClaudeModel(model)) {
+      return "https://agentrouter.org/v1/chat/completions";
+    }
+
     switch (this.provider) {
       case "claude":
       case "glm":
@@ -95,7 +103,18 @@ export class DefaultExecutor extends BaseExecutor {
     }
   }
 
-  buildHeaders(credentials, stream = true) {
+  buildHeaders(credentials, stream = true, model = null) {
+    if (this.provider === "agentrouter" && !isAgentRouterClaudeModel(model)) {
+      const headers = {
+        "Content-Type": "application/json",
+        ...this.config.headers,
+        "Authorization": `Bearer ${credentials.apiKey || credentials.accessToken}`
+      };
+      delete headers["x-api-key"];
+      if (stream) headers["Accept"] = "text/event-stream";
+      return headers;
+    }
+
     const headers = { "Content-Type": "application/json", ...this.config.headers };
 
     switch (this.provider) {

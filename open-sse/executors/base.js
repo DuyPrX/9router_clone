@@ -120,7 +120,7 @@ export class BaseExecutor {
       const requestBody = !stream && transformedBody?.stream_options
         ? (({ stream_options, ...rest }) => rest)(transformedBody)
         : transformedBody;
-      const headers = this.buildHeaders(credentials, stream);
+      const headers = this.buildHeaders(credentials, stream, model);
 
       if (!retryAttemptsByUrl[urlIndex]) retryAttemptsByUrl[urlIndex] = 0;
 

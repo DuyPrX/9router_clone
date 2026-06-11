@@ -39,7 +39,9 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
 
   const alias = PROVIDER_ID_TO_ALIAS[provider] || provider;
   const modelTargetFormat = getModelTargetFormat(alias, model);
-  const targetFormat = modelTargetFormat || getTargetFormat(provider);
+  const targetFormat = provider === "agentrouter" && !model.startsWith("claude-")
+    ? FORMATS.OPENAI
+    : (modelTargetFormat || getTargetFormat(provider));
   const stripList = getModelStrip(alias, model);
   const upstreamModel = getModelUpstreamId(alias, model);
   const dispatchModel = provider === "xiaomi-tokenplan" && modelTargetFormat === FORMATS.CLAUDE ? model : upstreamModel;
@@ -59,8 +61,7 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   }
 
   const clientRequestedStreaming = body.stream === true || sourceFormat === FORMATS.ANTIGRAVITY || sourceFormat === FORMATS.GEMINI || sourceFormat === FORMATS.GEMINI_CLI;
-  const providerRequiresStreaming = provider === "openai" || provider === "codex" || provider === "commandcode" ||
-    (provider === "agentrouter" && !model.startsWith("claude-"));
+  const providerRequiresStreaming = provider === "openai" || provider === "codex" || provider === "commandcode";
   const synthesizeClaudeStream = provider === "xiaomi-tokenplan" && modelTargetFormat === FORMATS.CLAUDE && sourceFormat === FORMATS.CLAUDE && body.stream === true;
   let stream = synthesizeClaudeStream ? false : (providerRequiresStreaming ? true : (body.stream !== false));
 
