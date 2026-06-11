@@ -420,8 +420,17 @@ export const PROVIDERS = {
   // Region map for Xiaomi MiMo Token Plan (keys are cluster-specific)
   // Used by resolveXiaomiTokenplanBaseUrl below
   // === Free-tier providers (synced from OmniRoute) ===
-  // Claude-format with Claude CLI header spoofing (auth: x-api-key)
-  agentrouter: { baseUrl: "https://agentrouter.org/v1/messages", format: "claude", headers: { ...CLAUDE_CLI_SPOOF_HEADERS } },
+  // AgentRouter exposes both Claude-compatible and OpenAI-compatible endpoints.
+  // Claude models use /v1/messages with x-api-key. Non-Claude models use
+  // /v1/chat/completions with Bearer auth, while still requiring Claude CLI
+  // fingerprint headers for client-gating.
+  agentrouter: {
+    baseUrl: "https://agentrouter.org/v1/messages",
+    messagesUrl: "https://agentrouter.org/v1/messages",
+    chatCompletionsUrl: "https://agentrouter.org/v1/chat/completions",
+    format: "claude",
+    headers: { ...CLAUDE_CLI_SPOOF_HEADERS }
+  },
   // OpenAI-compatible (auth: bearer)
   aimlapi: { baseUrl: "https://api.aimlapi.com/v1/chat/completions", format: "openai" },
   novita: { baseUrl: "https://api.novita.ai/v3/openai/chat/completions", format: "openai" },

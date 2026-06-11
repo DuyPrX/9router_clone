@@ -72,8 +72,10 @@ export class DefaultExecutor extends BaseExecutor {
       const normalized = baseUrl.replace(/\/$/, "");
       return `${normalized}/messages`;
     }
-    if (this.provider === "agentrouter" && !isAgentRouterClaudeModel(model)) {
-      return "https://agentrouter.org/v1/chat/completions";
+    if (this.provider === "agentrouter") {
+      return isAgentRouterClaudeModel(model)
+        ? (this.config.messagesUrl || this.config.baseUrl)
+        : (this.config.chatCompletionsUrl || "https://agentrouter.org/v1/chat/completions");
     }
 
     switch (this.provider) {
