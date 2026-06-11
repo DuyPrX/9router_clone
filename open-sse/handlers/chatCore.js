@@ -20,6 +20,52 @@ import { dedupeTools } from "../utils/toolDeduper.js";
 import { injectCaveman } from "../rtk/caveman.js";
 import { compressMessages, formatRtkLog } from "../rtk/index.js";
 
+function sanitizeAgentRouterOpenAISystem(body) {
+  const messages = Array.isArray(body?.messages) ? body.messages : null;
+  if (!messages) return 0;
+
+  let changed = 0;
+  for (const msg of messages) {
+    if (!msg || (msg.role !== "system" && msg.role !== "developer")) continue;
+    if (typeof msg.content === "string") {
+      const cleaned = sanitizeAgentRouterSystemText(msg.content);
+      if (cleaned !== msg.content) {
+        msg.content = cleaned;
+        changed++;
+      }
+    } else if (Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (!part || typeof part.text !== "string") continue;
+        const cleaned = sanitizeAgentRouterSystemText(part.text);
+        if (cleaned !== part.text) {
+          part.text = cleaned;
+          changed++;
+        }
+      }
+    }
+  }
+
+  return changed;
+}
+
+function sanitizeAgentRouterSystemText(text) {
+  return text
+    .replace(/^x-anthropic-billing-header:.*\n+/m, "")
+    .replace(/IMPORTANT: Assist with authorized security testing[\s\S]*?defensive use cases\.\n*/g, "");
+}
+
+function hasAgentRouterBlockedMonitorPrompt(body) {
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  return messages.some(msg => {
+    const text = typeof msg?.content === "string"
+      ? msg.content
+      : Array.isArray(msg?.content)
+        ? msg.content.map(part => part?.text || "").join("\n")
+        : "";
+    return text.includes("security monitor for autonomous AI coding agents") && text.includes("HARD BLOCK");
+  });
+}
+
 /**
  * Core chat handler - shared between SSE and Worker
  * @param {object} options.body - Request body
@@ -127,6 +173,15 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   if (getModelType(alias, model) === "tts" && translatedBody.messages) {
     translatedBody.messages = translatedBody.messages.filter(msg => msg.role !== "tool");
     delete translatedBody.tools;
+  }
+
+  if (provider === "agentrouter" && targetFormat === FORMATS.OPENAI) {
+    if (hasAgentRouterBlockedMonitorPrompt(translatedBody)) {
+      log?.warn?.("AGENTROUTER", "skip security-monitor prompt; use combo fallback");
+      return createErrorResult(HTTP_STATUS.BAD_GATEWAY, "AgentRouter rejects Claude Code security-monitor prompts; falling back");
+    }
+    const sanitized = sanitizeAgentRouterOpenAISystem(translatedBody);
+    if (sanitized > 0) log?.debug?.("AGENTROUTER", `sanitized ${sanitized} system block(s)`);
   }
 
   // RTK: compress tool_result content
