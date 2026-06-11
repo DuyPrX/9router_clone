@@ -373,8 +373,8 @@ export const PROVIDERS = {
     headers: { "x-opencode-client": "desktop" },
     noAuth: true,
     // Public OpenCode streams can keep the socket alive after useful output.
-    // Fail faster than the global 5-minute cap so agent sessions can recover.
-    streamMaxDurationMs: 90 * 1000
+    // Allow large Claude Code turns more time while still recovering before the global cap.
+    streamMaxDurationMs: 180 * 1000
   },
   "opencode-go": {
     baseUrl: "https://opencode.ai/zen/go/v1/chat/completions",
