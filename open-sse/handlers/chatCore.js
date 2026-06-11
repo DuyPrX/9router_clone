@@ -134,10 +134,13 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   const rtkLine = formatRtkLog(rtkStats);
   if (rtkLine) console.log(rtkLine);
 
-  // Caveman: inject terse-style system prompt
-  if (cavemanEnabled && cavemanLevel) {
+  // Caveman: inject terse-style system prompt. AgentRouter rejects this prompt
+  // with sensitive_words_detected on non-Claude models, so leave requests clean.
+  if (cavemanEnabled && cavemanLevel && provider !== "agentrouter") {
     injectCaveman(translatedBody, finalFormat, cavemanLevel);
     log?.debug?.("CAVEMAN", `${cavemanLevel} | ${finalFormat}`);
+  } else if (cavemanEnabled && cavemanLevel && provider === "agentrouter") {
+    log?.debug?.("CAVEMAN", `skip agentrouter | ${finalFormat}`);
   }
 
   const executor = getExecutor(provider);
