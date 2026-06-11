@@ -66,6 +66,11 @@ function hasAgentRouterBlockedMonitorPrompt(body) {
   });
 }
 
+function isUnsupportedToolModel(provider, model, body) {
+  const hasTools = Array.isArray(body?.tools) && body.tools.length > 0;
+  return hasTools && provider === "opencode" && typeof model === "string" && model.startsWith("nemotron-");
+}
+
 /**
  * Core chat handler - shared between SSE and Worker
  * @param {object} options.body - Request body
@@ -182,6 +187,11 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
     }
     const sanitized = sanitizeAgentRouterOpenAISystem(translatedBody);
     if (sanitized > 0) log?.debug?.("AGENTROUTER", `sanitized ${sanitized} system block(s)`);
+  }
+
+  if (isUnsupportedToolModel(provider, model, translatedBody)) {
+    log?.warn?.("TOOLS", `${provider}/${model} is not reliable for tool calls; use combo fallback`);
+    return createErrorResult(HTTP_STATUS.BAD_GATEWAY, `${provider}/${model} is not reliable for tool calls; falling back`);
   }
 
   // RTK: compress tool_result content
