@@ -14,7 +14,7 @@ import { getExecutor } from "../executors/index.js";
 import { buildRequestDetail, extractRequestConfig } from "./chatCore/requestDetail.js";
 import { handleForcedSSEToJson } from "./chatCore/sseToJsonHandler.js";
 import { handleNonStreamingResponse } from "./chatCore/nonStreamingHandler.js";
-import { handleStreamingResponse, buildOnStreamComplete, handleClaudeJsonAsStreamingResponse } from "./chatCore/streamingHandler.js";
+import { handleStreamingResponse, buildOnStreamComplete, handleClaudeJsonAsStreamingResponse, handleOpenAIJsonAsClaudeStreamingResponse } from "./chatCore/streamingHandler.js";
 import { detectClientTool, isNativePassthrough } from "../utils/clientDetector.js";
 import { dedupeTools } from "../utils/toolDeduper.js";
 import { injectCaveman } from "../rtk/caveman.js";
@@ -120,7 +120,10 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
 
   const clientRequestedStreaming = body.stream === true || sourceFormat === FORMATS.ANTIGRAVITY || sourceFormat === FORMATS.GEMINI || sourceFormat === FORMATS.GEMINI_CLI;
   const providerRequiresStreaming = provider === "openai" || provider === "codex" || provider === "commandcode";
-  const synthesizeClaudeStream = provider === "xiaomi-tokenplan" && modelTargetFormat === FORMATS.CLAUDE && sourceFormat === FORMATS.CLAUDE && body.stream === true;
+  const synthesizeClaudeStream = sourceFormat === FORMATS.CLAUDE && body.stream === true && (
+    (provider === "xiaomi-tokenplan" && modelTargetFormat === FORMATS.CLAUDE) ||
+    provider === "mmf"
+  );
   let stream = synthesizeClaudeStream ? false : (providerRequiresStreaming ? true : (body.stream !== false));
 
   // DeepSeek-TUI: interactive TUI panel sends stream:true and needs SSE.
@@ -351,6 +354,9 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   // This keeps Claude Code on SSE while avoiding flaky provider stream sockets.
   const { onStreamComplete } = buildOnStreamComplete({ ...sharedCtx });
   if (synthesizeClaudeStream) {
+    if (targetFormat === FORMATS.OPENAI) {
+      return handleOpenAIJsonAsClaudeStreamingResponse({ ...sharedCtx, providerResponse, reqLogger, streamController, onStreamComplete, trackDone, appendLog });
+    }
     return handleClaudeJsonAsStreamingResponse({ ...sharedCtx, providerResponse, reqLogger, streamController, onStreamComplete, trackDone, appendLog });
   }
 
