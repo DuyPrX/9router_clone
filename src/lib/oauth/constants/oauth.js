@@ -79,19 +79,6 @@ export const QODER_CONFIG = {
   loginUrl: "https://qoder.com/device/selectAccounts",
 };
 
-// iFlow OAuth Configuration (Authorization Code)
-export const IFLOW_CONFIG = {
-  clientId: "10009311001",
-  clientSecret: "4Z3YjXycVsQvyGF1etiNlIBB4RsqSDtW",
-  authorizeUrl: "https://iflow.cn/oauth",
-  tokenUrl: "https://iflow.cn/oauth/token",
-  userInfoUrl: "https://iflow.cn/api/oauth/getUserInfo",
-  extraParams: {
-    loginMethod: "phone",
-    type: "phone",
-  },
-};
-
 // Antigravity OAuth Configuration (Standard OAuth2 with Google)
 export const ANTIGRAVITY_CONFIG = {
   clientId: "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com",
@@ -267,7 +254,6 @@ export const PROVIDERS = {
   GEMINI: "gemini-cli",
   QWEN: "qwen",
   QODER: "qoder",
-  IFLOW: "iflow",
   ANTIGRAVITY: "antigravity",
   OPENAI: "openai",
   GITHUB: "github",

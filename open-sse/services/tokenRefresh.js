@@ -458,54 +458,6 @@ export async function refreshKiroToken(refreshToken, providerSpecificData, log, 
 }
 
 /**
- * Specialized refresh for iFlow OAuth tokens
- */
-export async function refreshIflowToken(refreshToken, log) {
-  if (!refreshToken) return null;
-  return dedupRefresh("iflow", refreshToken, async () => {
-  const basicAuth = btoa(`${PROVIDERS.iflow.clientId}:${PROVIDERS.iflow.clientSecret}`);
-
-  const response = await fetch(OAUTH_ENDPOINTS.iflow.token, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept: "application/json",
-      Authorization: `Basic ${basicAuth}`,
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-      client_id: PROVIDERS.iflow.clientId,
-      client_secret: PROVIDERS.iflow.clientSecret,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    log?.error?.("TOKEN_REFRESH", "Failed to refresh iFlow token", {
-      status: response.status,
-      error: errorText,
-    });
-    return null;
-  }
-
-  const tokens = await response.json();
-
-  log?.info?.("TOKEN_REFRESH", "Successfully refreshed iFlow token", {
-    hasNewAccessToken: !!tokens.access_token,
-    hasNewRefreshToken: !!tokens.refresh_token,
-    expiresIn: tokens.expires_in,
-  });
-
-  return {
-    accessToken: tokens.access_token,
-    refreshToken: tokens.refresh_token || refreshToken,
-    expiresIn: tokens.expires_in,
-  };
-  }, log);
-}
-
-/**
  * Specialized refresh for GitHub Copilot OAuth tokens
  */
 export async function refreshGitHubToken(refreshToken, log) {
@@ -636,9 +588,6 @@ async function _getAccessTokenInternal(provider, credentials, log) {
     case "qwen":
       return await refreshQwenToken(credentials.refreshToken, log);
 
-    case "iflow":
-      return await refreshIflowToken(credentials.refreshToken, log);
-
     case "github":
       return await refreshGitHubToken(credentials.refreshToken, log);
 
@@ -686,8 +635,6 @@ export async function refreshTokenByProvider(provider, credentials, log) {
       return refreshCodexToken(credentials.refreshToken, log);
     case "qwen":
       return refreshQwenToken(credentials.refreshToken, log);
-    case "iflow":
-      return refreshIflowToken(credentials.refreshToken, log);
     case "github":
       return refreshGitHubToken(credentials.refreshToken, log);
     case "kiro":
@@ -735,7 +682,6 @@ export function formatProviderCredentials(provider, credentials, log) {
 
     case "codex":
     case "qwen":
-    case "iflow":
     case "openai":
     case "openrouter":
     case "xai":

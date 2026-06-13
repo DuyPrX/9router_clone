@@ -4,7 +4,6 @@ const ALIAS_TO_PROVIDER_ID = {
   cx: "codex",
   gc: "gemini-cli",
   qw: "qwen",
-  if: "iflow",
   ag: "antigravity",
   gh: "github",
   kr: "kiro",
@@ -93,7 +92,6 @@ const ALIAS_TO_PROVIDER_ID = {
   polly: "aws-polly",
   "aws-polly": "aws-polly",
   // Free-tier providers (synced from OmniRoute)
-  agentrouter: "agentrouter",
   aimlapi: "aimlapi",
   aiml: "aimlapi",
   novita: "novita",

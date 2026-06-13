@@ -2,7 +2,7 @@
 
 const RISK_NOTICE = "⚠️ Risk Notice: This provider uses a subscription/OAuth session not officially licensed for proxy/router use. Account may be restricted or banned. Use at your own risk.";
 
-// Free Providers (kiro first, iflow last)
+// Free Providers
 export const FREE_PROVIDERS = {
   kiro: { id: "kiro", alias: "kr", name: "Kiro AI", icon: "psychology_alt", color: "#FF6B35", deprecated: true, deprecationNotice: RISK_NOTICE, website: "https://kiro.dev", notice: { signupUrl: "https://kiro.dev" } },
   // qwen: { id: "qwen", alias: "qw", name: "Qwen Code", icon: "psychology", color: "#10B981", mediaPriority: 999, deprecated: true, deprecationNotice: "Qwen OAuth free tier was discontinued by Alibaba on 2026-04-15. New connections will not work.", website: "https://chat.qwen.ai", notice: { signupUrl: "https://chat.qwen.ai" }, serviceKinds: ["llm", "tts"], ttsConfig: { baseUrl: "http://localhost:8000/v1/audio/speech", authType: "none", authHeader: "none", format: "openai", models: [{ id: "qwen3-tts", name: "Qwen3 TTS" }] } },
@@ -10,7 +10,6 @@ export const FREE_PROVIDERS = {
   // gitlab: { id: "gitlab", alias: "gl", name: "GitLab Duo", icon: "code", color: "#FC6D26" },
   // codebuddy: { id: "codebuddy", alias: "cb", name: "CodeBuddy", icon: "smart_toy", color: "#006EFF" },
   qoder: { id: "qoder", alias: "qd", name: "Qoder", icon: "water_drop", color: "#EC4899", deprecated: true, deprecationNotice: RISK_NOTICE, website: "https://qoder.com", notice: { signupUrl: "https://qoder.com" } },
-  iflow: { id: "iflow", alias: "if", name: "iFlow AI", icon: "water_drop", color: "#6366F1", website: "https://iflow.cn", notice: { signupUrl: "https://iflow.cn" } },
   opencode: { id: "opencode", alias: "oc", name: "OpenCode Free", icon: "terminal", color: "#E87040", textIcon: "OC", noAuth: true, passthroughModels: true, modelsFetcher: { url: "https://opencode.ai/zen/v1/models", type: "opencode-free" } },
   "mimo-free": { id: "mimo-free", alias: "mmf", name: "MiMo Code Free", icon: "smart_toy", color: "#FF6900", textIcon: "MF", noAuth: true, passthroughModels: true, modelsFetcher: { url: "https://models.dev/api.json", type: "mimo-free" } },
 };
@@ -117,8 +116,8 @@ export const APIKEY_PROVIDERS = {
   blackbox: { id: "blackbox", alias: "bb", name: "Blackbox AI", icon: "smart_toy", color: "#5B5FEF", textIcon: "BB", website: "https://blackbox.ai", notice: { apiKeyUrl: "https://www.blackbox.ai/api-management" }, serviceKinds: ["llm"] },
   chutes: { id: "chutes", alias: "ch", name: "Chutes AI", icon: "water_drop", color: "#ffffffff", textIcon: "CH", website: "https://chutes.ai", notice: { apiKeyUrl: "https://chutes.ai/app/api" } },
   // === Free-tier LLM providers (synced from OmniRoute) — DISABLED in UI ===
-  // Uncomment to re-enable. Backend config (PROVIDERS, PROVIDER_MODELS, ALIAS_TO_PROVIDER_ID) remains active.
-  agentrouter: { id: "agentrouter", alias: "agentrouter", name: "AgentRouter", icon: "router", color: "#10B981", textIcon: "AR", website: "https://agentrouter.org", notice: { text: "$200 free credits on signup - multi-model routing gateway.", apiKeyUrl: "https://agentrouter.org/register" }, passthroughModels: true, serviceKinds: ["llm"] },
+  // Re-enable by restoring backend PROVIDERS, PROVIDER_MODELS, and alias mapping from git history.
+  // agentrouter: disabled until provider handling is stable enough for Claude Code again.
   // aimlapi: { id: "aimlapi", alias: "aiml", name: "AI/ML API", icon: "hub", color: "#6366F1", textIcon: "AI", website: "https://aimlapi.com", notice: { text: "$0.025/day free — 200+ models (GPT-4o, Claude, Gemini, Llama) via single endpoint.", apiKeyUrl: "https://aimlapi.com/app/keys" }, passthroughModels: true, serviceKinds: ["llm", "image"] },
   // novita: { id: "novita", alias: "novita", name: "Novita AI", icon: "auto_awesome", color: "#FF4081", textIcon: "NV", website: "https://novita.ai", notice: { text: "$0.50 trial credits on signup (valid ~1 year).", apiKeyUrl: "https://novita.ai/settings/key-management" }, passthroughModels: true, serviceKinds: ["llm", "image"] },
   // modal: { id: "modal", alias: "mdl", name: "Modal", icon: "cloud_queue", color: "#7C3AED", textIcon: "MDL", website: "https://modal.com", notice: { text: "$30/month free credits for new accounts. Self-hosted OpenAI-compatible apps on /v1.", apiKeyUrl: "https://modal.com/settings/tokens" }, passthroughModels: true, serviceKinds: ["llm"], hasProviderSpecificData: true },

@@ -26,7 +26,7 @@ const CLAUDE_API_HEADERS = {
   "Anthropic-Beta": "claude-code-20250219,interleaved-thinking-2025-05-14"
 };
 
-// Full Claude CLI fingerprint — required by providers that gate on client identity (e.g. agentrouter)
+// Full Claude CLI fingerprint — required by providers that gate on client identity.
 const CLAUDE_CLI_SPOOF_HEADERS = {
   "Anthropic-Version": "2023-06-01",
   "Anthropic-Beta": "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,context-management-2025-06-27,prompt-caching-scope-2026-01-05,advanced-tool-use-2025-11-20,effort-2025-11-24,structured-outputs-2025-12-15,fast-mode-2026-02-01,redact-thinking-2026-02-12,token-efficient-tools-2026-03-28",
@@ -83,15 +83,6 @@ export const PROVIDERS = {
     clientId: "f0304373b74a44d2b584a3fb70ca9e56",
     tokenUrl: "https://chat.qwen.ai/api/v1/oauth2/token",
     authUrl: "https://chat.qwen.ai/api/v1/oauth2/device/code"
-  },
-  iflow: {
-    baseUrl: "https://apis.iflow.cn/v1/chat/completions",
-    format: "openai",
-    headers: { "User-Agent": "iFlow-Cli" },
-    clientId: "10009311001",
-    clientSecret: "4Z3YjXycVsQvyGF1etiNlIBB4RsqSDtW",
-    tokenUrl: "https://iflow.cn/oauth/token",
-    authUrl: "https://iflow.cn/oauth"
   },
   qoder: {
     // The qoder executor builds the full URL itself (it has to append
@@ -425,18 +416,8 @@ export const PROVIDERS = {
   // Region map for Xiaomi MiMo Token Plan (keys are cluster-specific)
   // Used by resolveXiaomiTokenplanBaseUrl below
   // === Free-tier providers (synced from OmniRoute) ===
-  // AgentRouter exposes both Claude-compatible and OpenAI-compatible endpoints.
-  // Claude models use /v1/messages with x-api-key. Non-Claude models use
-  // /v1/chat/completions with Bearer auth, while still requiring Claude CLI
-  // fingerprint headers for client-gating.
-  agentrouter: {
-    baseUrl: "https://agentrouter.org/v1/messages",
-    messagesUrl: "https://agentrouter.org/v1/messages",
-    chatCompletionsUrl: "https://agentrouter.org/v1/chat/completions",
-    format: "claude",
-    headers: { ...CLAUDE_CLI_SPOOF_HEADERS }
-  },
-  // OpenAI-compatible (auth: bearer)
+  // agentrouter: disabled until provider handling is stable enough for Claude Code again.
+  // Previous split config kept in git history: messagesUrl + chatCompletionsUrl with Claude CLI spoof headers.
   aimlapi: { baseUrl: "https://api.aimlapi.com/v1/chat/completions", format: "openai" },
   novita: { baseUrl: "https://api.novita.ai/v3/openai/chat/completions", format: "openai" },
   modal: { baseUrl: "https://api.modal.com/v1/chat/completions", format: "openai" },

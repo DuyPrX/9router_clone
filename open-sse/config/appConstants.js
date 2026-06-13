@@ -156,7 +156,6 @@ export const ANTIGRAVITY_DEFAULT_SYSTEM = "You are Antigravity, a powerful agent
 export const REFRESH_LEAD_MS = {
   codex:       5 * 24 * 60 * 60 * 1000, // 5 days
   claude:       4 * 60 * 60 * 1000,     // 4 hours
-  iflow:       24 * 60 * 60 * 1000,     // 24 hours
   qwen:        20 * 60 * 1000,          // 20 minutes
   "kimi-coding": 5 * 60 * 1000,         // 5 minutes
   antigravity:  5 * 60 * 1000,          // 5 minutes
@@ -179,10 +178,6 @@ export const OAUTH_ENDPOINTS = {
   qwen: {
     token: "https://qwen.ai/api/v1/oauth2/token",
     auth: "https://qwen.ai/api/v1/oauth2/device/code"
-  },
-  iflow: {
-    token: "https://iflow.cn/oauth/token",
-    auth: "https://iflow.cn/oauth"
   },
   github: {
     token: "https://github.com/login/oauth/access_token",

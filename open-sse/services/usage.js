@@ -81,8 +81,6 @@ export async function getUsageForProvider(connection, proxyOptions = null) {
       return await getQoderUsage(accessToken, proxyOptions);
     case "qwen":
       return await getQwenUsage(accessToken, providerSpecificData);
-    case "iflow":
-      return await getIflowUsage(accessToken);
     case "ollama":
       return await getOllamaUsage(accessToken);
     case "glm":
@@ -886,18 +884,6 @@ async function getQwenUsage(accessToken, providerSpecificData) {
     return { message: "Qwen connected. Usage tracked per request." };
   } catch (error) {
     return { message: "Unable to fetch Qwen usage." };
-  }
-}
-
-/**
- * iFlow Usage
- */
-async function getIflowUsage(accessToken) {
-  try {
-    // iFlow may have usage endpoint
-    return { message: "iFlow connected. Usage tracked per request." };
-  } catch (error) {
-    return { message: "Unable to fetch iFlow usage." };
   }
 }
 

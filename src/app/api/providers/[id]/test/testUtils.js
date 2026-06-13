@@ -56,12 +56,6 @@ const OAUTH_TEST_CONFIG = {
     authPrefix: "Bearer ",
     extraHeaders: { "User-Agent": "9Router", "Accept": "application/vnd.github+json" },
   },
-  iflow: {
-    // iFlow getUserInfo requires accessToken as query param, not header
-    buildUrl: (token) => `https://iflow.cn/api/oauth/getUserInfo?accessToken=${encodeURIComponent(token)}`,
-    method: "GET",
-    noAuth: true,
-  },
   qwen: { checkExpiry: true, refreshable: true },
   kiro: { checkExpiry: true, refreshable: true },
   qoder: {
