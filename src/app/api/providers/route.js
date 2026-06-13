@@ -60,8 +60,17 @@ export async function GET() {
       }
     } catch { }
 
+    // Hide stale provider rows whose provider was removed from active config.
+    // Keep custom compatible/embedding nodes because their IDs are user-defined.
+    const activeConnections = connections.filter(c => (
+      AI_PROVIDERS[c.provider] ||
+      isOpenAICompatibleProvider(c.provider) ||
+      isAnthropicCompatibleProvider(c.provider) ||
+      isCustomEmbeddingProvider(c.provider)
+    ));
+
     // Hide sensitive fields, enrich name for compatible providers
-    const safeConnections = connections.map(c => {
+    const safeConnections = activeConnections.map(c => {
       const isCompatible = isOpenAICompatibleProvider(c.provider) || isAnthropicCompatibleProvider(c.provider);
       const name = isCompatible
         ? (c.name || nodeNameMap[c.provider] || c.providerSpecificData?.nodeName || c.provider)

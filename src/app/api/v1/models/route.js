@@ -1,6 +1,7 @@
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models";
 import {
   AI_PROVIDERS,
+  FREE_PROVIDERS,
   getProviderAlias,
   isAnthropicCompatibleProvider,
   isOpenAICompatibleProvider,
@@ -248,7 +249,27 @@ export async function buildModelsList(kindFilter) {
       });
     }
   } else {
+    for (const [providerId, providerInfo] of Object.entries(FREE_PROVIDERS)) {
+      if (!providerInfo?.noAuth) continue;
+      if (!providerMatchesKinds(providerId, kindFilter)) continue;
+
+      const staticAlias = PROVIDER_ID_TO_ALIAS[providerId] || providerInfo.alias || providerId;
+      const providerModels = PROVIDER_MODELS[staticAlias] || [];
+      for (const model of providerModels) {
+        if (!kindFilter.includes(modelKind(model))) continue;
+        if (isDisabled(staticAlias, model.id)) continue;
+        models.push({
+          id: `${staticAlias}/${model.id}`,
+          object: "model",
+          owned_by: staticAlias,
+        });
+      }
+    }
+
     for (const [providerId, conn] of activeConnectionByProvider.entries()) {
+      const isCompatibleProvider =
+        isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
+      if (!AI_PROVIDERS[providerId] && !isCompatibleProvider) continue;
       if (!providerMatchesKinds(providerId, kindFilter)) continue;
 
       const staticAlias = PROVIDER_ID_TO_ALIAS[providerId] || providerId;
@@ -261,8 +282,6 @@ export async function buildModelsList(kindFilter) {
       const enabledModels = conn?.providerSpecificData?.enabledModels;
       const hasExplicitEnabledModels =
         Array.isArray(enabledModels) && enabledModels.length > 0;
-      const isCompatibleProvider =
-        isOpenAICompatibleProvider(providerId) || isAnthropicCompatibleProvider(providerId);
 
       // Build kind lookup for static models so we can filter even when only IDs are exposed
       const staticModelKindById = new Map(

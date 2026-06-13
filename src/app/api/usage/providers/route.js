@@ -20,16 +20,19 @@ export async function GET() {
       nodeMap[node.id] = node.name;
     }
 
-    const providers = providerIds.map(providerId => {
-      let name = providerId;
-      if (nodeMap[providerId]) {
-        name = nodeMap[providerId];
-      } else {
-        const providerConfig = getProviderByAlias(providerId) || AI_PROVIDERS[providerId];
-        if (providerConfig?.name) name = providerConfig.name;
-      }
-      return { id: providerId, name };
-    });
+    const providers = providerIds
+      .map(providerId => {
+        let name = providerId;
+        if (nodeMap[providerId]) {
+          name = nodeMap[providerId];
+        } else {
+          const providerConfig = getProviderByAlias(providerId) || AI_PROVIDERS[providerId];
+          if (!providerConfig) return null;
+          if (providerConfig.name) name = providerConfig.name;
+        }
+        return { id: providerId, name };
+      })
+      .filter(Boolean);
 
     return NextResponse.json({ providers });
   } catch (error) {

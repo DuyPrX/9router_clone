@@ -169,16 +169,26 @@ export default function ModelSelectModal({
       }
 
       if (providerInfo.passthroughModels) {
+        const staticModels = filterByKind(
+          getModelsByProviderId(providerId).map((m) => ({
+            id: m.id,
+            name: m.name,
+            value: `${alias}/${m.id}`,
+            type: m.type,
+          }))
+        );
+        const staticValues = new Set(staticModels.map((m) => m.value));
         const aliasModels = Object.entries(modelAliases)
           .filter(([, fullModel]) => fullModel.startsWith(`${alias}/`))
           .map(([aliasName, fullModel]) => ({
             id: fullModel.replace(`${alias}/`, ""),
             name: aliasName,
             value: fullModel,
-          }));
+          }))
+          .filter((m) => !staticValues.has(m.value));
 
         // For typed kinds, only include hardcoded typed models (aliases are typically LLM-only and lack type info)
-        let combined = aliasModels;
+        let combined = [...staticModels, ...aliasModels];
         if (kindFilter && TYPED_KINDS.has(kindFilter)) {
           combined = getModelsByProviderId(providerId)
             .filter((m) => m.type === kindFilter)
