@@ -120,9 +120,14 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
 
   const clientRequestedStreaming = body.stream === true || sourceFormat === FORMATS.ANTIGRAVITY || sourceFormat === FORMATS.GEMINI || sourceFormat === FORMATS.GEMINI_CLI;
   const providerRequiresStreaming = provider === "openai" || provider === "codex" || provider === "commandcode";
+  const mmfClaudeSyntheticNeeded = provider === "mmf" && sourceFormat === FORMATS.CLAUDE && body.stream === true && (
+    (Array.isArray(body.tools) && body.tools.length >= 20) ||
+    (Array.isArray(body.messages) && body.messages.length >= 12) ||
+    JSON.stringify(body).length >= 200000
+  );
   const synthesizeClaudeStream = sourceFormat === FORMATS.CLAUDE && body.stream === true && (
     (provider === "xiaomi-tokenplan" && modelTargetFormat === FORMATS.CLAUDE) ||
-    provider === "mmf"
+    mmfClaudeSyntheticNeeded
   );
   let stream = synthesizeClaudeStream ? false : (providerRequiresStreaming ? true : (body.stream !== false));
 
