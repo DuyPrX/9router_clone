@@ -42,7 +42,7 @@ function isValidPdfPagesArg(filePath, pages) {
 
 function shouldSuppressReasoningContent(state) {
   const provider = String(state?.provider || "").toLowerCase();
-  return provider.startsWith("opencode");
+  return provider.startsWith("opencode") || provider === "mimo-free" || provider === "mmf";
 }
 
 // Helper: stop thinking block if started

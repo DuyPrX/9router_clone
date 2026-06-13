@@ -212,6 +212,7 @@ export const PROVIDER_MODELS = {
   ],
   mmf: [  // MiMo Free
     { id: "mimo-auto", name: "MiMo Auto" },
+    { id: "mimo-auto-claude", name: "MiMo Auto (Claude Compatible)", upstreamModelId: "mimo-auto" },
     { id: "mimo-v2.5-pro", name: "MiMo V2.5 Pro" },
     { id: "mimo-v2.5", name: "MiMo V2.5" },
     { id: "mimo-v2-pro", name: "MiMo V2 Pro" },
