@@ -1,22 +1,10 @@
 import { BaseExecutor } from "./base.js";
-import { PROVIDERS, resolveXiaomiTokenplanBaseUrl } from "../config/providers.js";
+import { PROVIDERS } from "../config/providers.js";
 import { OAUTH_ENDPOINTS, buildKimiHeaders } from "../config/appConstants.js";
 import { buildClineHeaders } from "../../src/shared/utils/clineAuth.js";
 import { getCachedClaudeHeaders } from "../utils/claudeHeaderCache.js";
 import { proxyAwareFetch } from "../utils/proxyFetch.js";
 import { injectReasoningContent } from "../utils/reasoningContentInjector.js";
-
-function isXiaomiClaudeModel(model) {
-  return typeof model === "string" && model.endsWith("-claude");
-}
-
-function stripXiaomiClaudeSuffix(model) {
-  return isXiaomiClaudeModel(model) ? model.slice(0, -"-claude".length) : model;
-}
-
-function xiaomiTokenplanAnthropicBaseUrl(credentials) {
-  return resolveXiaomiTokenplanBaseUrl(credentials).replace(/\/v1\/?$/, "/anthropic/v1");
-}
 
 export class DefaultExecutor extends BaseExecutor {
   constructor(provider) {
@@ -25,9 +13,14 @@ export class DefaultExecutor extends BaseExecutor {
 
   transformRequest(model, body) {
     const transformed = this.applyJsonSchemaFallback(body);
-    const upstreamModel = stripXiaomiClaudeSuffix(model);
-    const withModel = upstreamModel !== model ? { ...transformed, model: upstreamModel } : transformed;
-    return injectReasoningContent({ provider: this.provider, model: upstreamModel, body: withModel });
+
+    if (transformed && typeof transformed === "object") {
+      if (this.provider === "cerebras" || this.provider === "mistral") {
+        delete transformed.client_metadata;
+      }
+    }
+
+    return injectReasoningContent({ provider: this.provider, model, body: transformed });
   }
 
   // Fallback json_schema → json_object for openai-compatible providers without native Structured Output.
@@ -74,10 +67,6 @@ export class DefaultExecutor extends BaseExecutor {
       case "gemini":
         return `${this.config.baseUrl}/${model}:${stream ? "streamGenerateContent?alt=sse" : "generateContent"}`;
       default: {
-        if (this.provider === "xiaomi-tokenplan") {
-          const baseUrl = resolveXiaomiTokenplanBaseUrl(credentials);
-          return isXiaomiClaudeModel(model) ? `${xiaomiTokenplanAnthropicBaseUrl(credentials)}/messages` : `${baseUrl}/chat/completions`;
-        }
         const url = this.config.baseUrl;
         if (url?.includes("{accountId}")) {
           const accountId = credentials?.providerSpecificData?.accountId;
@@ -175,6 +164,12 @@ export class DefaultExecutor extends BaseExecutor {
       const baseUrl = credentials?.providerSpecificData?.baseUrl || "";
       const isOfficialAnthropic = baseUrl === "" || baseUrl.includes("api.anthropic.com");
       if (!isOfficialAnthropic) {
+        // Some third-party Anthropic-compatible gateways require Bearer auth in
+        // addition to x-api-key. Send both (x-api-key already set above) so
+        // gateways that read either header succeed.
+        if (credentials.apiKey && !headers["Authorization"]) {
+          headers["Authorization"] = `Bearer ${credentials.apiKey}`;
+        }
         delete headers["anthropic-dangerous-direct-browser-access"];
         delete headers["Anthropic-Dangerous-Direct-Browser-Access"];
         delete headers["x-app"];
