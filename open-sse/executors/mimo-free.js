@@ -76,7 +76,11 @@ async function bootstrapJwt(proxyOptions = null) {
 
   const response = await proxyAwareFetch(BOOTSTRAP_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "mimocode/latest/local/cli",
+      "Accept": "*/*",
+    },
     body: JSON.stringify({ client: generateFingerprint() }),
   }, proxyOptions);
 
@@ -109,12 +113,18 @@ export class MimoFreeExecutor extends BaseExecutor {
       "Content-Type": "application/json",
       "X-Mimo-Source": "mimocode-cli-free",
       "x-session-affinity": this.sessionId,
+      "User-Agent": "mimocode/latest/local/cli",
+      "HTTP-Referer": "https://mimo.xiaomi.com/coder/",
+      "Referer": "https://mimo.xiaomi.com/coder/",
+      "x-opencode-client": "cli",
       "Accept": stream ? "text/event-stream" : "application/json",
     };
   }
 
   transformRequest(model, body) {
-    return injectSystemMarker(body);
+    // The free endpoint currently serves the auto router. Keep UI aliases usable
+    // by normalizing every MiMo Free request to the supported upstream model.
+    return { ...injectSystemMarker(body), model: "mimo-auto" };
   }
 
   async execute({ model, body, stream, credentials, signal, log, proxyOptions = null }) {
