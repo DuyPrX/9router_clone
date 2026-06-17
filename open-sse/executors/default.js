@@ -5,6 +5,7 @@ import { buildClineHeaders } from "../../src/shared/utils/clineAuth.js";
 import { getCachedClaudeHeaders } from "../utils/claudeHeaderCache.js";
 import { proxyAwareFetch } from "../utils/proxyFetch.js";
 import { injectReasoningContent } from "../utils/reasoningContentInjector.js";
+import { stripUnsupportedParams } from "../translator/helpers/paramSupport.js";
 
 function isXiaomiClaudeModel(model) {
   return typeof model === "string" && model.endsWith("-claude");
@@ -57,6 +58,7 @@ export class DefaultExecutor extends BaseExecutor {
       if (this.provider === "cerebras" || this.provider === "mistral") {
         delete transformed.client_metadata;
       }
+      stripUnsupportedParams(this.provider, model, transformed);
     }
     const upstreamModel = stripXiaomiClaudeSuffix(model);
     const withModel = upstreamModel !== model ? { ...transformed, model: upstreamModel } : transformed;
