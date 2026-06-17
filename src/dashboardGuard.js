@@ -89,6 +89,7 @@ function isLoopbackHostname(h) {
 }
 
 function isLocalRequest(request) {
+  if (request.headers.get("x-9r-via-proxy")) return false;
   if (!isLoopbackHostname(request.headers.get("host"))) return false;
   const origin = request.headers.get("origin");
   if (origin) {
