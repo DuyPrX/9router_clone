@@ -72,7 +72,7 @@ export function translateNonStreamingResponse(responseBody, targetFormat, source
 
   // Claude
   if (targetFormat === FORMATS.CLAUDE) {
-    if (!responseBody.content) return responseBody;
+    if (responseBody.choices || (responseBody.content && !Array.isArray(responseBody.content))) return responseBody;
 
     let textContent = "", thinkingContent = "";
     const toolCalls = [];
@@ -209,11 +209,14 @@ export async function handleNonStreamingResponse({ providerResponse, provider, m
     translatedResponse.usage = filterUsageForFormat(addBufferToUsage(translatedResponse.usage), sourceFormat);
   }
 
-  // Strip reasoning_content — some clients (e.g. Firecrawl AI SDK) have JSON parsers that
-  // break on this non-standard field, even though OpenAI allows it in extensions.
+  // Strip reasoning_content only when content is non-empty.
+  // When content is empty (e.g. thinking models that used all tokens for reasoning),
+  // reasoning_content is the only useful output and must be preserved.
   if (translatedResponse?.choices) {
     for (const choice of translatedResponse.choices) {
-      if (choice?.message) delete choice.message.reasoning_content;
+      if (choice?.message?.reasoning_content && choice.message.content) {
+        delete choice.message.reasoning_content;
+      }
     }
   }
 
