@@ -32,11 +32,24 @@ export async function resolveModelAlias(alias) {
   return resolveModelAliasFromMap(alias, aliases);
 }
 
+function stripContextTag(modelStr) {
+  return typeof modelStr === "string" ? modelStr.replace(/\[1m\]$/i, "") : modelStr;
+}
+
+async function resolveComboAlias(alias) {
+  const aliases = await getModelAliases();
+  const target = aliases?.[alias] || aliases?.[stripContextTag(alias)];
+  if (typeof target !== "string" || target.includes("/")) return null;
+  const combo = await getComboByName(target);
+  return combo ? target : null;
+}
+
 /**
  * Get full model info (parse or resolve)
  */
 export async function getModelInfo(modelStr) {
-  const parsed = parseModel(modelStr);
+  const normalizedModelStr = stripContextTag(modelStr);
+  const parsed = parseModel(normalizedModelStr);
 
   if (!parsed.isAlias) {
     // Provider-node prefixes are user-defined. They must not override built-in
@@ -66,16 +79,21 @@ export async function getModelInfo(modelStr) {
     };
   }
 
-  // Check if this is a combo name before resolving as alias
-  // This prevents combo names from being incorrectly routed to providers
+  // Check if this is a combo name before resolving as provider alias.
+  // This prevents combo names from being incorrectly routed to providers.
   const combo = await getComboByName(parsed.model);
   if (combo) {
-    // Return null provider to signal this should be handled as combo
-    // The caller (handleChat) will detect this and handle it as combo
     return { provider: null, model: parsed.model };
   }
 
-  return getModelInfoCore(modelStr, getModelAliases);
+  // Allow aliases to point at combo names, not just provider/model strings.
+  // Useful for clients with hardcoded model metadata, e.g. Claude Code 1M variants.
+  const comboAlias = await resolveComboAlias(parsed.model);
+  if (comboAlias) {
+    return { provider: null, model: comboAlias };
+  }
+
+  return getModelInfoCore(normalizedModelStr, getModelAliases);
 }
 
 /**
@@ -83,12 +101,20 @@ export async function getModelInfo(modelStr) {
  * @returns {Promise<string[]|null>} Array of models or null if not a combo
  */
 export async function getComboModels(modelStr) {
+  const normalizedModelStr = stripContextTag(modelStr);
   // Only check if it's not in provider/model format
-  if (modelStr.includes("/")) return null;
+  if (normalizedModelStr.includes("/")) return null;
 
-  const combo = await getComboByName(modelStr);
-  if (combo && combo.models && combo.models.length > 0) {
-    return combo.models;
+  const directCombo = await getComboByName(normalizedModelStr);
+  if (directCombo && directCombo.models && directCombo.models.length > 0) {
+    return directCombo.models;
   }
+
+  const comboAlias = await resolveComboAlias(normalizedModelStr);
+  if (comboAlias) {
+    const combo = await getComboByName(comboAlias);
+    if (combo && combo.models && combo.models.length > 0) return combo.models;
+  }
+
   return null;
 }

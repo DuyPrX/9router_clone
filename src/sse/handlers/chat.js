@@ -191,18 +191,22 @@ export async function handleChat(request, clientRawRequest = null) {
 async function handleSingleModelChat(body, modelStr, clientRawRequest = null, request = null, apiKey = null) {
   const modelInfo = await getModelInfo(modelStr);
 
-  // If provider is null, this might be a combo name - check and handle
-  if (!modelInfo.provider) {
-    const comboModels = await getComboModels(modelStr);
+  // If provider is null, this might be a combo name. Some alias paths also
+  // resolve to the virtual provider `combo`, with the real combo name in model.
+  const comboName = !modelInfo.provider
+    ? modelStr
+    : (modelInfo.provider === "combo" ? modelInfo.model : null);
+  if (comboName) {
+    const comboModels = await getComboModels(comboName);
     if (comboModels) {
       const chatSettings = await getSettings();
       // Check for combo-specific strategy first, fallback to global
       const comboStrategies = chatSettings.comboStrategies || {};
-      const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
+      const comboSpecificStrategy = comboStrategies[comboName]?.fallbackStrategy;
       const comboStrategy = comboSpecificStrategy || chatSettings.comboStrategy || "fallback";
 
       if (comboStrategy === "fusion") {
-        log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: fusion)`);
+        log.info("CHAT", `Combo "${comboName}" with ${comboModels.length} models (strategy: fusion)`);
         return handleFusionChat({
           body,
           models: comboModels,
@@ -215,20 +219,20 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
             return handleSingleModelChat(b, m, cleanRawReq, request, apiKey);
           },
           log,
-          comboName: modelStr,
-          judgeModel: comboStrategies[modelStr]?.judgeModel,
-          tuning: comboStrategies[modelStr]?.fusionTuning,
+          comboName,
+          judgeModel: comboStrategies[comboName]?.judgeModel,
+          tuning: comboStrategies[comboName]?.fusionTuning,
         });
       }
 
       const comboStickyLimit = chatSettings.comboStickyRoundRobinLimit;
-      log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
+      log.info("CHAT", `Combo "${comboName}" with ${comboModels.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
       return handleComboChat({
         body,
         models: comboModels,
         handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
         log,
-        comboName: modelStr,
+        comboName,
         comboStrategy,
         comboStickyLimit
       });
