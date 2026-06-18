@@ -18,6 +18,8 @@ export default {
       "x-opencode-client": "desktop",
     },
     noAuth: true,
+    // Allow large Claude Code turns more time while still recovering before the global cap.
+    streamMaxDurationMs: 180 * 1000,
   },
   models: [],
   modelsFetcher: { url: "https://opencode.ai/zen/v1/models", type: "opencode-free" },

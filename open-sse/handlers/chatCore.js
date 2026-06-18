@@ -25,6 +25,18 @@ import { getCapabilitiesForModel } from "../providers/capabilities.js";
 import { stripUnsupportedModalities } from "../translator/concerns/modality.js";
 import { prefetchRemoteImages } from "../translator/concerns/prefetch.js";
 
+function tuneNemotronRequest(provider, model, body) {
+  if (provider !== "opencode" || typeof model !== "string" || !model.startsWith("nemotron-") || !body) {
+    return false;
+  }
+
+  body.include_reasoning = false;
+  body.reasoning = { ...(body.reasoning || {}), enabled: false };
+  if (body.temperature === undefined || body.temperature === null) body.temperature = 0;
+  if (Array.isArray(body.tools) && body.tools.length > 0 && !body.tool_choice) body.tool_choice = "auto";
+  return true;
+}
+
 /**
  * Core chat handler - shared between SSE and Worker
  * @param {object} options.body - Request body
@@ -142,6 +154,10 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   if (getModelType(alias, model) === "tts" && translatedBody.messages) {
     translatedBody.messages = translatedBody.messages.filter(msg => msg.role !== "tool");
     delete translatedBody.tools;
+  }
+
+  if (tuneNemotronRequest(provider, model, translatedBody)) {
+    log?.debug?.("NEMOTRON", "reasoning disabled; tool_choice auto; temperature pinned");
   }
 
   // RTK: compress tool_result content
