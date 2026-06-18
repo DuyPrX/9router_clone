@@ -92,7 +92,18 @@ export const MODEL_CAPABILITIES = {
 /**
  * Provider-specific capability overrides. Keyed by provider alias/id.
  */
-export const PROVIDER_CAPABILITIES = {};
+export const PROVIDER_CAPABILITIES = {
+  // MiMo Free Claude-compatible alias still routes upstream to mimo-auto.
+  // Keep capability planning aligned with MiMo v2.5 Free instead of broad *claude* matching.
+  mmf: {
+    "mimo-auto": { vision: true, contextWindow: 1048576, maxOutput: 131072 },
+    "mimo-auto-claude": { vision: true, contextWindow: 1048576, maxOutput: 131072 },
+  },
+  "mimo-free": {
+    "mimo-auto": { vision: true, contextWindow: 1048576, maxOutput: 131072 },
+    "mimo-auto-claude": { vision: true, contextWindow: 1048576, maxOutput: 131072 },
+  },
+};
 
 /**
  * Pattern fallback — glob (* = wildcard), matched case-insensitively and
