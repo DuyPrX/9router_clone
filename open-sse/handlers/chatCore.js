@@ -25,6 +25,25 @@ import { getCapabilitiesForModel } from "../providers/capabilities.js";
 import { stripUnsupportedModalities } from "../translator/concerns/modality.js";
 import { prefetchRemoteImages } from "../translator/concerns/prefetch.js";
 
+
+function formatModalityStripDetails(stats) {
+  if (!stats?.total) return null;
+  const counts = stats.counts || {};
+  const countText = [
+    counts.vision ? `image=${counts.vision}` : null,
+    counts.pdf ? `pdf=${counts.pdf}` : null,
+    counts.audioInput ? `audio=${counts.audioInput}` : null,
+  ].filter(Boolean).join(", ");
+  const blocks = (stats.removed || []).slice(0, 12).map((item) => {
+    const loc = item.messageIndex === undefined || item.messageIndex === null ? "msg=?" : `msg=${item.messageIndex}`;
+    const role = item.role ? ` role=${item.role}` : "";
+    const mime = item.mimeType ? ` mime=${item.mimeType}` : "";
+    return `${loc}${role} turn=${item.turn} type=${item.blockType || "unknown"} cap=${item.cap}${mime}`;
+  });
+  const suffix = stats.removed?.length > blocks.length ? `; +${stats.removed.length - blocks.length} more` : "";
+  return `total=${stats.total}${countText ? ` | ${countText}` : ""} | ${blocks.join("; ")}${suffix}`;
+}
+
 function tuneNemotronRequest(provider, model, body) {
   if (provider !== "opencode" || typeof model !== "string" || !model.startsWith("nemotron-") || !body) {
     return false;
@@ -44,7 +63,7 @@ function tuneNemotronRequest(provider, model, body) {
  * @param {object} options.credentials - Provider credentials
  * @param {string} options.sourceFormatOverride - Override detected source format (e.g. "openai-responses")
  */
-export async function handleChatCore({ body, modelInfo, credentials, log, onCredentialsRefreshed, onRequestSuccess, onDisconnect, clientRawRequest, connectionId, userAgent, apiKey, ccFilterNaming, rtkEnabled, cavemanEnabled, cavemanLevel, sourceFormatOverride, providerThinking }) {
+export async function handleChatCore({ body, modelInfo, credentials, log, onCredentialsRefreshed, onRequestSuccess, onDisconnect, clientRawRequest, connectionId, userAgent, apiKey, ccFilterNaming, rtkEnabled, cavemanEnabled, cavemanLevel, sourceFormatOverride, providerThinking, logModalityStripDetails = false }) {
   const { provider, model } = modelInfo;
   const requestStartTime = Date.now();
 
@@ -109,8 +128,13 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   // Auto-strip media blocks the model can't read (vision/audio/pdf) before translation.
   if (!passthrough) {
     const caps = getCapabilitiesForModel(provider, model);
-    if (stripUnsupportedModalities(body, sourceFormat, caps)) {
-      log?.debug?.("MODALITY", `stripped unsupported media for ${provider}/${model}`);
+    const modalityStripStats = { total: 0, counts: {}, removed: [] };
+    if (stripUnsupportedModalities(body, sourceFormat, caps, modalityStripStats) && modalityStripStats.total > 0) {
+      if (logModalityStripDetails) {
+        log?.debug?.("MODALITY", `stripped unsupported media for ${provider}/${model} | ${formatModalityStripDetails(modalityStripStats)}`);
+      } else {
+        log?.debug?.("MODALITY", `stripped unsupported media for ${provider}/${model}`);
+      }
     }
     // Convert remote image URLs to base64 for targets that can't fetch URLs.
     try {

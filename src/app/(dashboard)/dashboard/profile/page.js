@@ -477,6 +477,21 @@ export default function ProfilePage() {
     }
   };
 
+  const updateLogModalityStripDetails = async (enabled) => {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logModalityStripDetails: enabled }),
+      });
+      if (res.ok) {
+        setSettings(prev => ({ ...prev, logModalityStripDetails: enabled }));
+      }
+    } catch (err) {
+      console.error("Failed to update logModalityStripDetails:", err);
+    }
+  };
+
   const reloadSettings = async () => {
     try {
       const res = await fetch("/api/settings");
@@ -569,6 +584,7 @@ export default function ProfilePage() {
 
   const observabilityEnabled = settings.enableObservability === true;
   const logToolSourcesEnabled = settings.logToolSources === true;
+  const logModalityStripDetailsEnabled = settings.logModalityStripDetails === true;
 
   const handleShutdown = async () => {
     setIsShuttingDown(true);
@@ -1130,6 +1146,20 @@ export default function ProfilePage() {
               <Toggle
                 checked={logToolSourcesEnabled}
                 onChange={updateLogToolSources}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="flex items-start sm:items-center justify-between gap-4 pt-4 border-t border-border/50">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm sm:text-base">Log Media Strip Details</p>
+                <p className="text-xs sm:text-sm text-text-muted">
+                  Add counts and block metadata when unsupported images, PDFs, or audio are removed before routing
+                </p>
+              </div>
+              <Toggle
+                checked={logModalityStripDetailsEnabled}
+                onChange={updateLogModalityStripDetails}
                 disabled={loading}
               />
             </div>

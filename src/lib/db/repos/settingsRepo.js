@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   oidcLoginLabel: "Sign in with OIDC",
   enableObservability: true,
   logToolSources: false,
+  logModalityStripDetails: false,
   observabilityMaxRecords: 1000,
   observabilityBatchSize: 20,
   observabilityFlushIntervalMs: 5000,
