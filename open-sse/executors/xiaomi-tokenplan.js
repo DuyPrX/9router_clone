@@ -8,7 +8,8 @@ export class XiaomiTokenplanExecutor extends DefaultExecutor {
     super("xiaomi-tokenplan");
   }
 
-  // Claude-native aliases route to the Anthropic-compatible messages endpoint
+  // Token Plan keys are region-specific. Normal models use /chat/completions;
+  // Claude-native aliases use the region Anthropic-compatible endpoint.
   buildUrl(model, stream, urlIndex = 0, credentials = null) {
     const baseUrl = resolveXiaomiTokenplanBaseUrl(credentials);
     if (getModelTargetFormat("xiaomi-tokenplan", model) === FORMATS.CLAUDE) {
