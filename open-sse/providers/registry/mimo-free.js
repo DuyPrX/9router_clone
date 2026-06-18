@@ -18,6 +18,7 @@ export default {
   },
   models: [
     { id: "mimo-auto", name: "MiMo Auto" },
+    { id: "mimo-auto-claude", name: "MiMo Auto (Claude Compatible)", upstreamModelId: "mimo-auto" },
   ],
   modelsFetcher: { url: "https://models.dev/api.json", type: "mimo-free" },
   passthroughModels: true,
