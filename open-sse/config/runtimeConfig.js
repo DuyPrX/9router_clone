@@ -46,6 +46,10 @@ export const STREAM_STALL_TIMEOUT_MS = envMs("STREAM_STALL_TIMEOUT_MS", 360 * 10
 // Time-to-first-token timeout (prompt prefill). Env: STREAM_FIRST_CHUNK_TIMEOUT_MS.
 export const STREAM_FIRST_CHUNK_TIMEOUT_MS = envMs("STREAM_FIRST_CHUNK_TIMEOUT_MS", 200 * 1000);
 
+// Downstream SSE heartbeat for clients that abort an otherwise healthy stream
+// when a reasoning provider produces no translatable output. Set to 0 to disable.
+export const STREAM_HEARTBEAT_INTERVAL_MS = envMs("STREAM_HEARTBEAT_INTERVAL_MS", 15 * 1000);
+
 // Stream max duration: abort even if upstream keepalive bytes prevent idle stall detection.
 // Env: STREAM_MAX_DURATION_MS.
 export const STREAM_MAX_DURATION_MS = envMs("STREAM_MAX_DURATION_MS", 5 * 60 * 1000);

@@ -94,10 +94,15 @@ export function createStreamController({ onDisconnect, onError, log, provider, m
  * for long periods while raw bytes still flow (e.g. Kiro EventStream
  * binary frames buffering, Claude reasoning streams).
  */
-export function createDisconnectAwareStream(transformStream, streamController, onAbortTerminal = null) {
+export function createDisconnectAwareStream(transformStream, streamController, onAbortTerminal = null, heartbeatMs = 0) {
   const reader = transformStream.readable.getReader();
   const writer = transformStream.writable.getWriter();
   let terminalEmitted = false;
+  let heartbeatTimer = null;
+  const heartbeatBytes = new TextEncoder().encode(": keepalive\n\n");
+  const clearHeartbeat = () => {
+    if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+  };
 
   // Emit a synthesized terminal payload (e.g. Responses response.failed + [DONE]) once
   const emitTerminal = (controller) => {
@@ -110,8 +115,24 @@ export function createDisconnectAwareStream(transformStream, streamController, o
   };
 
   return new ReadableStream({
+    start(controller) {
+      if (heartbeatMs <= 0) return;
+      heartbeatTimer = setInterval(() => {
+        if (!streamController.isConnected()) {
+          clearHeartbeat();
+          return;
+        }
+        try {
+          controller.enqueue(heartbeatBytes);
+        } catch {
+          clearHeartbeat();
+        }
+      }, heartbeatMs);
+    },
+
     async pull(controller) {
       if (!streamController.isConnected()) {
+        clearHeartbeat();
         emitTerminal(controller);
         controller.close();
         return;
@@ -121,12 +142,14 @@ export function createDisconnectAwareStream(transformStream, streamController, o
         const { done, value } = await reader.read();
 
         if (done) {
+          clearHeartbeat();
           streamController.handleComplete();
           controller.close();
           return;
         }
         controller.enqueue(value);
       } catch (error) {
+        clearHeartbeat();
         const wasConnected = streamController.isConnected();
         // Controller already closed = downstream ended; not an upstream error, skip noisy log.
         const msg0 = error?.message || "";
@@ -164,6 +187,7 @@ export function createDisconnectAwareStream(transformStream, streamController, o
     },
 
     cancel(reason) {
+      clearHeartbeat();
       streamController.handleDisconnect(reason || "cancelled");
       reader.cancel();
       writer.abort();
@@ -189,7 +213,7 @@ export function createDisconnectAwareStream(transformStream, streamController, o
  * @param {TransformStream} transformStream - Transform stream for SSE
  * @param {object} streamController - Stream controller from createStreamController
  */
-export function pipeWithDisconnect(providerResponse, transformStream, streamController, onAbortTerminal = null, stallTimeoutMs = STREAM_STALL_TIMEOUT_MS, maxDurationMs = STREAM_MAX_DURATION_MS) {
+export function pipeWithDisconnect(providerResponse, transformStream, streamController, onAbortTerminal = null, stallTimeoutMs = STREAM_STALL_TIMEOUT_MS, maxDurationMs = STREAM_MAX_DURATION_MS, heartbeatMs = 0) {
   let stallTimer = null;
   let maxDurationTimer = null;
   let chunkCount = 0;
@@ -264,7 +288,7 @@ export function pipeWithDisconnect(providerResponse, transformStream, streamCont
   return createDisconnectAwareStream(
     { readable: transformedBody, writable: { getWriter: () => ({ abort: () => Promise.resolve() }) } },
     wrappedController,
-    onAbortTerminal
+    onAbortTerminal,
+    heartbeatMs
   );
 }
-

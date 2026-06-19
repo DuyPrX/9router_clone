@@ -3,7 +3,7 @@ import { needsTranslation } from "../../translator/index.js";
 import { createSSETransformStreamWithLogger, createPassthroughStreamWithLogger } from "../../utils/stream.js";
 import { pipeWithDisconnect } from "../../utils/streamHandler.js";
 import { PROVIDERS } from "../../config/providers.js";
-import { STREAM_STALL_TIMEOUT_MS } from "../../config/runtimeConfig.js";
+import { STREAM_HEARTBEAT_INTERVAL_MS, STREAM_STALL_TIMEOUT_MS } from "../../config/runtimeConfig.js";
 import { buildAbortedResponsesTerminalBytes } from "../../utils/responsesStreamHelpers.js";
 import { buildRequestDetail, extractRequestConfig, saveUsageStats } from "./requestDetail.js";
 import { saveRequestDetail } from "@/lib/usageDb.js";
@@ -53,7 +53,10 @@ export function handleStreamingResponse({ providerResponse, provider, model, sou
   const onAbortTerminal = isResponsesPassthrough ? buildAbortedResponsesTerminalBytes : null;
   const stallTimeoutMs = PROVIDERS[provider]?.stallTimeoutMs || STREAM_STALL_TIMEOUT_MS;
   const maxDurationMs = PROVIDERS[provider]?.streamMaxDurationMs;
-  const transformedBody = pipeWithDisconnect(providerResponse, transformStream, streamController, onAbortTerminal, stallTimeoutMs, maxDurationMs);
+  // SSE comments keep Claude Code connected while provider reasoning/prefill
+  // produces upstream bytes that do not translate into client-visible events.
+  const heartbeatMs = sourceFormat === FORMATS.CLAUDE ? STREAM_HEARTBEAT_INTERVAL_MS : 0;
+  const transformedBody = pipeWithDisconnect(providerResponse, transformStream, streamController, onAbortTerminal, stallTimeoutMs, maxDurationMs, heartbeatMs);
 
   const streamDetailId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   saveRequestDetail(buildRequestDetail({
