@@ -9,6 +9,65 @@ import { buildRequestDetail, extractRequestConfig, extractUsageFromResponse, sav
 import { appendRequestLog, saveRequestDetail } from "@/lib/usageDb.js";
 import { decloakToolNames } from "../../utils/claudeCloaking.js";
 
+function openAICompletionToClaude(responseBody) {
+  const choice = responseBody?.choices?.[0];
+  const message = choice?.message;
+  if (!message) return responseBody;
+
+  const content = [];
+  const reasoning = message.reasoning_content || message.reasoning;
+  if (reasoning) content.push({ type: "thinking", thinking: String(reasoning) });
+
+  if (typeof message.content === "string" && message.content) {
+    content.push({ type: "text", text: message.content });
+  } else if (Array.isArray(message.content)) {
+    for (const part of message.content) {
+      if (part?.type === "text" && part.text) content.push({ type: "text", text: part.text });
+    }
+  }
+
+  for (const toolCall of message.tool_calls || []) {
+    let input = {};
+    try {
+      input = typeof toolCall.function?.arguments === "string"
+        ? JSON.parse(toolCall.function.arguments)
+        : (toolCall.function?.arguments || {});
+    } catch {
+      input = { raw_arguments: toolCall.function?.arguments || "" };
+    }
+    content.push({
+      type: "tool_use",
+      id: toolCall.id,
+      name: toolCall.function?.name || "",
+      input,
+    });
+  }
+
+  const finishReason = choice.finish_reason === "tool_calls"
+    ? "tool_use"
+    : choice.finish_reason === "length"
+      ? "max_tokens"
+      : "end_turn";
+  const usage = responseBody.usage || {};
+
+  return {
+    id: responseBody.id?.replace(/^chatcmpl-/, "msg_") || `msg_${Date.now()}`,
+    type: "message",
+    role: "assistant",
+    model: responseBody.model || "unknown",
+    content,
+    stop_reason: finishReason,
+    stop_sequence: null,
+    usage: {
+      input_tokens: usage.prompt_tokens || 0,
+      output_tokens: usage.completion_tokens || 0,
+      ...(usage.prompt_tokens_details?.cached_tokens
+        ? { cache_read_input_tokens: usage.prompt_tokens_details.cached_tokens }
+        : {}),
+    },
+  };
+}
+
 /**
  * Translate non-streaming response body from provider format → OpenAI format.
  */
@@ -177,7 +236,9 @@ export async function handleNonStreamingResponse({ providerResponse, provider, m
   saveUsageStats({ provider, model, tokens: usage, connectionId, apiKey, endpoint: clientRawRequest?.endpoint });
 
   const translatedResponse = needsTranslation(targetFormat, sourceFormat)
-    ? translateNonStreamingResponse(responseBody, targetFormat, sourceFormat)
+    ? (targetFormat === FORMATS.OPENAI && sourceFormat === FORMATS.CLAUDE
+        ? openAICompletionToClaude(responseBody)
+        : translateNonStreamingResponse(responseBody, targetFormat, sourceFormat))
     : responseBody;
 
   // Fix finish_reason for tool_calls: some providers return non-standard values (e.g. "other")
