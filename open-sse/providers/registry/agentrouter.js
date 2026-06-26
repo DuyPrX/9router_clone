@@ -32,8 +32,10 @@ export default {
     streamMaxDurationMs: 5 * 60 * 1000,
   },
   models: [
+    { id: "claude-opus-4-6", name: "Claude Opus 4.6" },
     { id: "claude-opus-4-7", name: "Claude Opus 4.7" },
     { id: "claude-opus-4-8", name: "Claude Opus 4.8" },
+    { id: "glm-5.2", name: "GLM 5.2", targetFormat: "openai" },
     { id: "gpt-5.5", name: "GPT-5.5", targetFormat: "openai" },
   ],
   serviceKinds: ["llm"],
