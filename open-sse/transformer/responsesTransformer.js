@@ -299,11 +299,10 @@ export function createResponsesApiTransformStream(logger = null) {
           });
         }
 
-        // Handle reasoning_content (OpenAI native format)
-        if (delta.reasoning_content) {
-          startReasoning(controller, idx);
-          emitReasoningDelta(controller, delta.reasoning_content);
-        }
+        // Provider reasoning deltas are intentionally not emitted here.
+        // Some upstreams stream reasoning and message content under the same choice index;
+        // emitting both as Responses output_index=0 can make Codex abort the stream.
+        // Keep the Codex-facing stream focused on assistant text/tool output.
 
         // Handle text content (may contain <think> tags)
         if (delta.content) {
